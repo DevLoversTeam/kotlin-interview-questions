@@ -15886,11 +15886,11 @@ val showScrollTop by remember {
 
 #### Kotlin
 
-Асинхронний тест без корутин синхронізують із конкретною подією: callback, result, state update або idle state. Очікування завжди має timeout; `Thread.sleep()` для цього не підходить.
+Асинхронний тест без корутин має чекати конкретну подію: callback, result, state update або idle state. Очікування завжди має timeout. `Thread.sleep()` — поганий варіант.
 
-1. **CountDownLatch**
+### CountDownLatch
 
-Для callback-based API підійде `CountDownLatch`:
+Для callback-based API:
 
 ```kotlin
 @Test
@@ -15917,22 +15917,24 @@ fun `loads user successfully`() {
 }
 ```
 
-2. **CompletableFuture**
+### CompletableFuture
 
-Для одного result/error callback можна адаптувати до `CompletableFuture`:
+Для одного result/error:
 
 ```kotlin
 val future = CompletableFuture<User>()
+
 repository.loadUser("42", object : UserCallback {
     override fun onSuccess(user: User) = future.complete(user)
     override fun onError(error: Throwable) = future.completeExceptionally(error)
 })
+
 assertEquals("42", future.get(2, TimeUnit.SECONDS).id)
 ```
 
-3. **Очікування state**
+### Очікування state
 
-Awaitility або власний polling helper може чекати, доки assertion стане істинним:
+Можна використовувати Awaitility або власний polling helper:
 
 ```kotlin
 @Test
@@ -15949,7 +15951,7 @@ fun `updates cache`() {
 
 Тест завершується одразу після виконання умови, а не чекає фіксовану затримку.
 
-4. **LiveData**
+### LiveData
 
 Для `LiveData` використовують `InstantTaskExecutorRule` і helper на кшталт `getOrAwaitValue()`:
 
@@ -15964,9 +15966,9 @@ fun `emits user`() {
 }
 ```
 
-Helper має підписатися, дочекатися значення з timeout і видалити observer у `finally`.
+Helper має підписатися, чекати value з timeout і видалити observer у `finally`.
 
-5. **UI-тести**
+### UI tests
 
 Espresso синхронізують через `IdlingResource`:
 
@@ -15981,9 +15983,9 @@ fun loadData() {
 }
 ```
 
-6. **Fake dependency**
+### Fake dependency
 
-Найстабільніший unit test використовує fake, завершення якого контролює сам тест:
+Найстабільніший unit test — керований fake:
 
 ```kotlin
 class FakeUserApi : UserApi {
@@ -15993,13 +15995,15 @@ class FakeUserApi : UserApi {
         this.callback = callback
     }
 
-    fun complete(user: User) = callback?.onSuccess(user)
+    fun complete(user: User) {
+        callback?.onSuccess(user)
+    }
 }
 ```
 
-Тест сам викликає `complete()`, тому не залежить від network timing.
+Тест сам викликає `complete()`, тому не залежить від timing network/thread scheduler.
 
-7. **Антипатерн**
+Антипатерн:
 
 ```kotlin
 repository.refresh()
@@ -16007,11 +16011,12 @@ Thread.sleep(2_000)
 assertEquals(expected, repository.currentValue)
 ```
 
-Коротка затримка дає випадковий failure, довга — марнує час.
+Коротка затримка дає flaky test, довга — марнує час.
 
-**Коротко:** тест має чекати конкретну подію з timeout. Для цього використовують `CountDownLatch`, `CompletableFuture`, Awaitility, LiveData helper, Espresso `IdlingResource` або керований fake — але не `Thread.sleep()`.
+**Коротко:** асинхронний тест без корутин має чекати конкретну подію з timeout. Для цього використовують `CountDownLatch`, `CompletableFuture`, polling/Awaitility, LiveData helper, Espresso `IdlingResource` або керований fake, але не `Thread.sleep()`.
 
 </details>
+
 <details>
 <summary>214. У чому різниця між inline, noinline та crossinline?</summary>
 
