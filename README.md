@@ -9,10 +9,34 @@ Junior
 Основи мови
 
 * Що таке Kotlin і як він взаємодіє з Java?
+  Kotlin — сучасна statically typed мова від JetBrains, що працює на JVM, Android, а також підтримує Multiplatform. З Java вона повністю сумісна: Kotlin-код може викликати Java-класи, а Java — Kotlin-код.
+
+  ```kotlin
+  val list = java.util.ArrayList<String>()
+  list.add("Hello")
+  ```
 * Які базові типи даних існують у Kotlin?
+  Основні типи: `Int`, `Long`, `Short`, `Byte`, `Float`, `Double`, `Boolean`, `Char`, `String`. У Kotlin все є обʼєктом на рівні мови, але на JVM примітиви оптимізуються до primitive type там, де можливо.
 * У чому різниця між val і var у Kotlin?
+  `val` — змінна тільки для читання, її не можна переприсвоїти після ініціалізації. `var` — змінна, значення якої можна змінювати.
+
+  ```kotlin
+  val name = "Ivan"
+  var age = 20
+  age = 21
+  ```
 * Що таке виведення типів (type inference) у Kotlin?
+  Це здатність компілятора автоматично визначати тип змінної або результату виразу, якщо він очевидний з контексту. Тому тип часто не потрібно вказувати явно.
+
+  ```kotlin
+  val count = 10 // Int
+  ```
 * Що таке функції-розширення (extension functions)?
+  Це функції, які дозволяють додати нову поведінку до існуючого класу без наслідування і без зміни його коду. Важливо: вони не змінюють сам клас, а лише дають зручний синтаксис виклику.
+
+  ```kotlin
+  fun String.lastChar(): Char = this[this.length - 1]
+  ```
 * Що таке data class у Kotlin?
 * Що таке companion object?
 * Як створюються класи у Kotlin?
