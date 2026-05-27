@@ -18791,11 +18791,11 @@ fun printList(items: List<*>) {
 
 #### Kotlin
 
-Колекції — це структури даних для зберігання групи елементів. У Kotlin найчастіше використовують `List`, `Set`, `Map`, а для черг і стеків — Java/Kotlin-compatible структури на кшталт `ArrayDeque`. Вибір колекції залежить від того, чи потрібен порядок, унікальність, доступ за ключем, FIFO або LIFO поведінка.
+Колекції — це структури даних для зберігання групи елементів. У Kotlin найчастіше використовують `List`, `Set`, `Map`, а для черг і стеків — `ArrayDeque`. Вибір залежить від того, чи потрібен порядок, унікальність, доступ за ключем, FIFO або LIFO поведінка.
 
 1. **List**
 
-`List` — впорядкована колекція, яка дозволяє дублікати.
+`List` — впорядкована колекція, яка дозволяє дублікати:
 
 ```kotlin
 val names: List<String> = listOf("Alex", "Kate", "Alex")
@@ -18822,7 +18822,7 @@ mutableNames.remove("Alex")
 
 2. **Set**
 
-`Set` — колекція унікальних елементів.
+`Set` — колекція унікальних елементів:
 
 ```kotlin
 val ids: Set<String> = setOf("1", "2", "1")
@@ -18834,11 +18834,7 @@ val ids: Set<String> = setOf("1", "2", "1")
 1, 2
 ```
 
-Особливості:
-
-- дублікати не зберігаються;
-- добре підходить для membership check;
-- порядок залежить від конкретної реалізації.
+`Set` добре підходить для membership check:
 
 ```kotlin
 if ("1" in ids) {
@@ -18848,7 +18844,7 @@ if ("1" in ids) {
 
 3. **Map**
 
-`Map` — колекція пар key-value.
+`Map` — колекція пар key-value:
 
 ```kotlin
 val usersById: Map<String, User> = mapOf(
@@ -18870,13 +18866,6 @@ val user = usersById["1"]
 - зручно для lookup за id;
 - порядок залежить від реалізації.
 
-Mutable version:
-
-```kotlin
-val cache = mutableMapOf<String, User>()
-cache["1"] = User("1", "Alex")
-```
-
 4. **Queue**
 
 Queue — структура з поведінкою FIFO:
@@ -18896,12 +18885,7 @@ queue.addLast("B")
 val first = queue.removeFirst() // A
 ```
 
-Queue корисна для:
-
-- черги задач;
-- BFS;
-- event processing;
-- buffering.
+Queue корисна для черги задач, BFS, event processing, buffering.
 
 5. **Stack**
 
@@ -18922,13 +18906,7 @@ stack.addLast("B")
 val last = stack.removeLast() // B
 ```
 
-Stack корисний для:
-
-- DFS;
-- undo/redo;
-- back stack;
-- parsing;
-- навігаційних сценаріїв.
+Stack корисний для DFS, undo/redo, back stack, parsing.
 
 6. **ArrayDeque**
 
@@ -18959,57 +18937,17 @@ val users: List<User> = listOf()
 val mutableUsers: MutableList<User> = mutableListOf()
 ```
 
-`List` не має методів `add/remove`.  
-`MutableList` має.
+`List` не має методів `add/remove`, а `MutableList` має. Це не гарантує глибоку immutability, але API обмежує мутацію.
 
-Це не завжди означає глибоку immutability underlying object-а, але API обмежує можливість мутації.
+8. **Коли що використовувати**
 
-8. **Типові реалізації**
+- `List` — потрібен порядок, index, дублікати допустимі.
+- `Set` — потрібна унікальність і швидка перевірка наявності.
+- `Map` — потрібен доступ за ключем або cache/lookup table.
+- `Queue` — треба обробляти в порядку надходження.
+- `Stack` — треба обробляти останній доданий елемент першим.
 
-На JVM часто використовуються:
-
-- `ArrayList` для `MutableList`;
-- `LinkedHashSet` для `Set`;
-- `LinkedHashMap` для `Map`;
-- `ArrayDeque` для queue/stack behavior.
-
-У більшості Android-коду достатньо працювати через interfaces:
-
-```kotlin
-List<User>
-Set<String>
-Map<String, User>
-```
-
-А не привʼязуватися до конкретної реалізації без потреби.
-
-9. **Коли що використовувати**
-
-`List`:
-
-- потрібен порядок;
-- потрібен доступ за index;
-- дублікати допустимі.
-
-`Set`:
-
-- потрібна унікальність;
-- треба швидко перевіряти наявність.
-
-`Map`:
-
-- потрібен доступ за ключем;
-- треба кеш або lookup table.
-
-`Queue`:
-
-- треба обробляти в порядку надходження.
-
-`Stack`:
-
-- треба обробляти останній доданий елемент першим.
-
-10. **Приклад в Android**
+9. **Приклад в Android**
 
 Список для UI:
 
@@ -19041,29 +18979,29 @@ class UserMemoryCache {
 }
 ```
 
-11. **Performance на практиці**
+10. **Performance на практиці**
 
 Типові складності:
 
-- `List` access by index: O(1) для ArrayList;
-- `List.contains`: O(n);
-- `Set.contains`: зазвичай O(1) для hash-based set;
-- `Map.get`: зазвичай O(1) для hash-based map;
-- `Queue add/remove` на кінцях `ArrayDeque`: O(1) amortized.
+- `List` access by index: `O(1)` для `ArrayList`;
+- `List.contains`: `O(n)`;
+- `Set.contains`: зазвичай `O(1)` для hash-based set;
+- `Map.get`: зазвичай `O(1)` для hash-based map;
+- `ArrayDeque` add/remove на кінцях: `O(1)` amortized.
 
 Якщо часто перевіряєш membership, `Set` краще за `List`.
 
-12. **Практичне правило**
+11. **Практичне правило**
 
 - Для UI списків — `List`.
 - Для унікальних id — `Set`.
 - Для lookup/cache за id — `Map`.
 - Для FIFO — `ArrayDeque` як queue.
 - Для LIFO — `ArrayDeque` як stack.
-- За замовчуванням віддавати read-only interfaces.
-- Mutable collections тримати всередині класу й не віддавати назовні напряму.
+- Назовні віддавати read-only interfaces.
+- Mutable collections тримати всередині класу.
 
-**Коротко:** `List` зберігає порядок і дублікати, `Set` гарантує унікальність, `Map` дає доступ за ключем, `Queue` працює за FIFO, `Stack` — за LIFO. У Kotlin/Android важливо вибирати колекцію під конкретний сценарій і не відкривати mutable state без потреби.
+**Коротко:** `List` зберігає порядок і дублікати, `Set` гарантує унікальність, `Map` дає доступ за ключем, `Queue` працює за FIFO, `Stack` — за LIFO. У Kotlin/Android треба вибирати колекцію під сценарій і не відкривати mutable state без потреби.
 
 </details>
 <details>
@@ -19567,13 +19505,7 @@ try {
 }
 ```
 
-Його використовують для:
-
-- закриття ресурсів;
-- скидання loading state;
-- unlock;
-- unregister listener;
-- cleanup temporary state.
+Його використовують для закриття ресурсів, скидання loading state, unlock, unregister listener або cleanup temporary state.
 
 5. **try як expression**
 
@@ -19589,8 +19521,6 @@ val result = try {
 
 Тип `result` буде `User?`.
 
-Ще приклад:
-
 ```kotlin
 val message = try {
     loadMessage()
@@ -19599,7 +19529,7 @@ val message = try {
 }
 ```
 
-6. **finally не змінює результат зазвичай**
+6. **finally не має повертати значення**
 
 ```kotlin
 val value = try {
@@ -19613,9 +19543,7 @@ val value = try {
 
 `finally` виконається, але значенням буде `"success"` або `"error"`.
 
-Не варто робити `return` із `finally`, бо це може приховати exception або результат.
-
-Погано:
+Не варто робити `return` із `finally`, бо це може приховати exception або результат:
 
 ```kotlin
 fun load(): String {
@@ -19627,31 +19555,21 @@ fun load(): String {
 }
 ```
 
-Такий код важко читати і він може ламати очікувану поведінку.
+Такий код важко читати і він ламає очікувану поведінку.
 
 7. **runCatching як альтернатива**
-
-У Kotlin часто використовують `runCatching`:
 
 ```kotlin
 val result = runCatching {
     repository.getUser(userId)
 }
-```
 
-Обробка:
-
-```kotlin
 result
-    .onSuccess { user ->
-        render(user)
-    }
-    .onFailure { error ->
-        showError(error.message)
-    }
+    .onSuccess { user -> render(user) }
+    .onFailure { error -> showError(error.message) }
 ```
 
-Але `try-catch` часто читабельніший, коли потрібна різна обробка різних exception types.
+`runCatching` зручний для простого wrapping у `Result`, але `try-catch` часто читабельніший, коли потрібна різна обробка різних exception types.
 
 8. **try-catch у coroutines**
 
@@ -19666,7 +19584,7 @@ viewModelScope.launch {
 }
 ```
 
-Важливо: `try-catch` ловить exception всередині цієї coroutine. Якщо exception виникла в іншій coroutine, потрібна окрема обробка.
+`try-catch` ловить exception всередині цієї coroutine. Якщо exception виникла в іншій coroutine, потрібна окрема обробка.
 
 9. **CancellationException**
 
@@ -19712,11 +19630,11 @@ val job = viewModelScope.launch {
 job.cancel()
 ```
 
-`finally` допомагає гарантовано скинути state.
+Це корисно, щоб гарантовано скинути state.
 
-11. **use замість manual finally для Closeable**
+11. **use замість manual finally**
 
-Для `Closeable` ресурсів краще:
+Для `Closeable` ресурсів краще використовувати `use`:
 
 ```kotlin
 FileInputStream(file).use { stream ->
@@ -19725,17 +19643,6 @@ FileInputStream(file).use { stream ->
 ```
 
 `use` автоматично закриє stream навіть при exception.
-
-Це краще, ніж manual:
-
-```kotlin
-val stream = FileInputStream(file)
-try {
-    stream.readBytes()
-} finally {
-    stream.close()
-}
-```
 
 12. **Практичне правило**
 
