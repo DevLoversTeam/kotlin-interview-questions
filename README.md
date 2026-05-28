@@ -11715,10 +11715,7 @@ object FakeNetworkModule
 
 #### Kotlin
 
-`@HiltViewModel` — це Hilt-анотація для `ViewModel`, яка дозволяє Hilt створювати
-`ViewModel` і передавати в неї залежності через constructor injection. Вона
-інтегрує `ViewModel` з Hilt dependency graph і `ViewModelProvider`, щоб
-розробник не писав власну factory вручну.
+`@HiltViewModel` — це Hilt-анотація для `ViewModel`, яка дозволяє Hilt створювати `ViewModel` і передавати в неї залежності через constructor injection. Вона інтегрує `ViewModel` з Hilt dependency graph і `ViewModelProvider`, щоб не писати власну factory вручну.
 
 1. **Базовий приклад**
 
@@ -11739,12 +11736,11 @@ class UserViewModel @Inject constructor(
 }
 ```
 
-Тут Hilt сам створить `UserViewModel` і передасть `LoadUserUseCase`.
+Hilt сам створить `UserViewModel` і передасть `LoadUserUseCase`.
 
 2. **Навіщо потрібен @HiltViewModel**
 
-Звичайна `ViewModel` створюється через `ViewModelProvider`. Якщо у ViewModel є
-constructor parameters, Android не знає, як її створити:
+Звичайна `ViewModel` створюється через `ViewModelProvider`. Якщо у ViewModel є constructor parameters, Android не знає, як її створити:
 
 ```kotlin
 class UserViewModel(
@@ -11762,7 +11758,7 @@ class UserViewModelFactory(
 
 `@HiltViewModel` прибирає цей boilerplate.
 
-3. **Як отримати Hilt ViewModel у Fragment**
+3. **Отримання у Fragment або Activity**
 
 Fragment має бути `@AndroidEntryPoint`:
 
@@ -11774,10 +11770,7 @@ class UserFragment : Fragment(R.layout.fragment_user) {
 }
 ```
 
-`by viewModels()` використає Hilt-generated factory і створить ViewModel через
-DI graph.
-
-4. **Як отримати Hilt ViewModel в Activity**
+Activity аналогічно:
 
 ```kotlin
 @AndroidEntryPoint
@@ -11787,10 +11780,9 @@ class MainActivity : AppCompatActivity() {
 }
 ```
 
-Activity теж має бути entry point, якщо вона отримує Hilt ViewModel або інші
-injected dependencies.
+`by viewModels()` використає Hilt-generated factory.
 
-5. **Що має бути в constructor**
+4. **Constructor dependencies**
 
 Constructor має бути позначений `@Inject`:
 
@@ -11802,16 +11794,9 @@ class UserViewModel @Inject constructor(
 ) : ViewModel()
 ```
 
-Hilt може інжектити:
+Hilt може інжектити use cases, repositories, dispatchers, analytics, `SavedStateHandle` та інші залежності з graph.
 
-- use cases;
-- repositories;
-- dispatchers;
-- analytics;
-- `SavedStateHandle`;
-- інші залежності, які є в graph.
-
-6. **SavedStateHandle**
+5. **SavedStateHandle**
 
 `SavedStateHandle` підтримується Hilt автоматично:
 
@@ -11827,10 +11812,9 @@ class DetailsViewModel @Inject constructor(
 }
 ```
 
-Це корисно для navigation arguments і state, який має пережити process
-recreation.
+Це корисно для navigation arguments і state, який має пережити process recreation.
 
-7. **ViewModelComponent**
+6. **ViewModelComponent і scopes**
 
 Dependencies для Hilt ViewModel живуть у `ViewModelComponent`:
 
@@ -11846,32 +11830,16 @@ object ViewModelModule {
 }
 ```
 
-Якщо dependency scoped як `@ViewModelScoped`, вона буде одна на конкретний
-instance ViewModel.
+Якщо dependency scoped як `@ViewModelScoped`, вона буде одна на конкретний instance ViewModel:
 
 ```kotlin
 @ViewModelScoped
 class UserSessionCache @Inject constructor()
 ```
 
-8. **@ViewModelScoped vs @Singleton**
+`@Singleton` — один instance на весь app graph, `@ViewModelScoped` — один instance на конкретну ViewModel.
 
-`@Singleton`:
-
-```text
-один instance на весь app graph
-```
-
-`@ViewModelScoped`:
-
-```text
-один instance на конкретну ViewModel
-```
-
-Не треба робити все singleton. Якщо обʼєкт потрібен тільки для одного екрана,
-його lifecycle має бути ближчим до ViewModel.
-
-9. **Compose і hiltViewModel**
+7. **Compose і hiltViewModel**
 
 У Compose можна отримати Hilt ViewModel так:
 
@@ -11884,33 +11852,28 @@ fun UserScreen(
 }
 ```
 
-`hiltViewModel()` бере ViewModel із відповідного navigation/back stack owner і
-використовує Hilt factory.
+`hiltViewModel()` бере ViewModel із відповідного navigation/back stack owner і використовує Hilt factory.
 
-10. **Типові помилки**
+8. **Типові помилки**
 
 - Забути `@HiltViewModel`.
 - Забути `@Inject constructor`.
 - Забути `@AndroidEntryPoint` на Activity/Fragment.
-- Намагатися створити Hilt ViewModel вручну через constructor.
+- Створювати Hilt ViewModel вручну через constructor.
 - Інжектити Activity/Fragment/View у ViewModel.
 - Робити ViewModel singleton.
-- Тримати в ViewModel reference на `Context`, якщо це не application context і
-  немає чіткої потреби.
+- Тримати в ViewModel `Context`, якщо це не application context і немає чіткої потреби.
 
-11. **Практичне правило**
+9. **Практичне правило**
 
 - `@HiltViewModel` ставиться на ViewModel.
 - Constructor ViewModel має бути `@Inject`.
 - UI component має бути `@AndroidEntryPoint`.
 - Залежності ViewModel мають приходити через constructor.
 - Для navigation args використовувати `SavedStateHandle`.
-- Для ViewModel-local dependencies використовувати `@ViewModelScoped`, якщо
-  потрібен scope.
+- Для ViewModel-local dependencies використовувати `@ViewModelScoped`, якщо потрібен scope.
 
-**Коротко:** `@HiltViewModel` дозволяє Hilt створювати `ViewModel` через generated
-factory і constructor injection. Це прибирає ручні factories, робить ViewModel
-тестованою і правильно інтегрує її залежності з Android/Hilt lifecycle.
+**Коротко:** `@HiltViewModel` дозволяє Hilt створювати `ViewModel` через generated factory і constructor injection. Це прибирає ручні factories, робить ViewModel тестованою і правильно інтегрує її залежності з Android/Hilt lifecycle.
 
 </details>
 <details>
@@ -12106,10 +12069,7 @@ Hilt/Dagger через code generation:
 
 #### Kotlin
 
-Scopes у Hilt визначають, скільки живе dependency і в межах якого Hilt component
-вона перевикористовується. Іншими словами, scope відповідає на питання: "один
-instance на весь застосунок, на Activity, на ViewModel, на Fragment чи кожного
-разу новий?".
+Scopes у Hilt визначають, скільки живе dependency і в межах якого Hilt component вона перевикористовується. Іншими словами, scope відповідає на питання: один instance на весь app, на Activity, на ViewModel, на Fragment чи кожного разу новий.
 
 1. **Навіщо потрібні scopes**
 
@@ -12128,8 +12088,7 @@ class UserFormatter @Inject constructor()
 class AppDatabaseProvider @Inject constructor()
 ```
 
-Scope дозволяє не створювати database, repository cache або session object
-щоразу заново.
+Scope дозволяє не створювати database, repository cache або session object щоразу заново.
 
 2. **Hilt components**
 
@@ -12169,30 +12128,18 @@ object DatabaseModule {
 }
 ```
 
-Це правильний scope для:
-
-- Room database;
-- OkHttpClient;
-- Retrofit;
-- application-wide repositories, якщо вони stateless або мають app-wide cache;
-- analytics client;
-- app-level configuration.
-
-Не треба робити singleton усе підряд.
+Підходить для Room database, OkHttpClient, Retrofit, analytics client, app-level configuration. Не треба робити singleton усе підряд.
 
 4. **ActivityRetainedScoped**
 
-`@ActivityRetainedScoped` живе довше за Activity instance і переживає
-configuration changes:
+`@ActivityRetainedScoped` переживає configuration changes:
 
 ```kotlin
 @ActivityRetainedScoped
 class UserSession @Inject constructor()
 ```
 
-Цей scope привʼязаний не до конкретної Activity instance, а до retained lifecycle.
-Він корисний для обʼєктів, які мають пережити rotation, але не мають бути
-singleton на весь app.
+Це не конкретна Activity instance, а retained lifecycle. Scope корисний для обʼєктів, які мають пережити rotation, але не мають бути singleton на весь app.
 
 5. **@ViewModelScoped**
 
@@ -12220,7 +12167,7 @@ object UserModule {
 
 Це корисно для dependencies, які мають жити стільки ж, скільки ViewModel.
 
-6. **ActivityScoped**
+6. **ActivityScoped і FragmentScoped**
 
 `@ActivityScoped` — один instance на Activity:
 
@@ -12231,10 +12178,7 @@ class ScreenTracker @Inject constructor(
 )
 ```
 
-Цей scope живе в межах конкретної Activity instance. Після recreation Activity
-буде новий instance.
-
-7. **FragmentScoped**
+Після recreation Activity буде новий instance.
 
 `@FragmentScoped` — один instance на Fragment:
 
@@ -12243,10 +12187,9 @@ class ScreenTracker @Inject constructor(
 class FragmentAnalyticsTracker @Inject constructor()
 ```
 
-Його використовують рідше, але він доречний, коли dependency має сенс тільки в
-межах конкретного Fragment.
+Його використовують, коли dependency має сенс тільки в межах конкретного Fragment.
 
-8. **Scope має відповідати component**
+7. **Scope має відповідати component**
 
 Scope і `@InstallIn` мають бути сумісні:
 
@@ -12263,10 +12206,9 @@ object NetworkModule {
 }
 ```
 
-Погано встановлювати Activity-scoped binding у SingletonComponent. Hilt зазвичай
-зловить такі помилки на compile time.
+Activity-scoped binding не можна встановлювати в `SingletonComponent`. Hilt зазвичай ловить такі помилки на compile time.
 
-9. **Небезпека неправильного scope**
+8. **Небезпека неправильного scope**
 
 Погано:
 
@@ -12277,8 +12219,7 @@ class ActivityHolder @Inject constructor(
 )
 ```
 
-Singleton житиме весь app lifecycle, а `ActivityContext` має жити тільки поки
-живе Activity. Це прямий шлях до memory leak.
+Singleton житиме весь app lifecycle, а `ActivityContext` має жити тільки поки живе Activity. Це memory leak.
 
 Краще:
 
@@ -12291,7 +12232,7 @@ class ActivityHolder @Inject constructor(
 
 Або взагалі не тримати `ActivityContext`, якщо він не потрібен.
 
-10. **Unscoped dependencies**
+9. **Unscoped dependencies**
 
 Не всі залежності треба scope-ити:
 
@@ -12299,10 +12240,9 @@ class ActivityHolder @Inject constructor(
 class UserMapper @Inject constructor()
 ```
 
-Якщо клас stateless, дешевий і не тримає ресурси, unscoped dependency часто
-нормальна. Scope додає lifecycle semantics, і його треба застосовувати свідомо.
+Якщо клас stateless, дешевий і не тримає ресурси, unscoped dependency нормальна. Scope додає lifecycle semantics, тому його треба застосовувати свідомо.
 
-11. **Практичне правило**
+10. **Практичне правило**
 
 - `@Singleton` — app-wide залежності.
 - `@ActivityRetainedScoped` — переживає configuration changes.
@@ -12312,9 +12252,7 @@ class UserMapper @Inject constructor()
 - Не scope-ити stateless cheap objects без потреби.
 - Не тримати короткоживучий `Context` у довгоживучому scope.
 
-**Коротко:** scopes у Hilt керують lifecycle і reuse dependencies. Правильний scope
-захищає від зайвого створення обʼєктів і memory leaks, неправильний — навпаки
-може привʼязати Activity/Fragment до довгоживучого graph-а.
+**Коротко:** scopes у Hilt керують lifecycle і reuse dependencies. Правильний scope захищає від зайвого створення обʼєктів і memory leaks, неправильний може привʼязати Activity/Fragment до довгоживучого graph-а.
 
 </details>
 <details>
@@ -16995,7 +16933,7 @@ Receiver type (`UserDto`) важливий для resolution.
 
 #### Kotlin
 
-Overloading і overriding — це різні механізми. Overloading — це кілька функцій з однаковою назвою, але різними параметрами в одному scope. Overriding — це заміна реалізації функції з базового класу або інтерфейсу в дочірньому класі.
+Overloading і overriding — це різні механізми. `Overloading` — кілька функцій з однаковою назвою, але різними параметрами в одному scope. `Overriding` — нова реалізація функції з базового класу або інтерфейсу в дочірньому класі.
 
 1. **Overloading**
 
@@ -17027,28 +16965,20 @@ class UserRepository {
 - типи параметрів;
 - порядок параметрів.
 
-Приклад:
-
 ```kotlin
 fun track(event: String)
 fun track(event: AnalyticsEvent)
 fun track(event: String, params: Map<String, String>)
 ```
 
-Це валідне перевантаження.
-
-3. **Return type не створює overload**
-
-Погано:
+Return type сам по собі не створює overload:
 
 ```kotlin
 fun getValue(): String = "text"
-fun getValue(): Int = 42
+fun getValue(): Int = 42 // compile error
 ```
 
-Так не можна, бо return type сам по собі не відрізняє сигнатуру для overload.
-
-4. **Overriding**
+3. **Overriding**
 
 Overriding — це перевизначення методу базового contract-а:
 
@@ -17067,11 +16997,11 @@ class RealUserRepository(
 }
 ```
 
-Тут `RealUserRepository` дає конкретну реалізацію методу з `UserRepository`.
+`RealUserRepository` дає конкретну реалізацію методу з `UserRepository`.
 
-5. **Override в class inheritance**
+4. **Override в class inheritance**
 
-У Kotlin клас і методи `final` за замовчуванням. Щоб метод можна було override-ити, він має бути `open` або бути частиною interface/abstract class.
+У Kotlin класи й методи `final` за замовчуванням. Щоб метод можна було override-ити, він має бути `open` або бути частиною interface/abstract class.
 
 ```kotlin
 open class BaseAnalyticsTracker {
@@ -17089,17 +17019,16 @@ class FirebaseAnalyticsTracker : BaseAnalyticsTracker() {
 
 Без `open` override неможливий.
 
-6. **Головна різниця**
+5. **Головна різниця**
 
 ```text
 Overloading -> та сама назва, різні параметри
 Overriding  -> та сама сигнатура, нова реалізація в subtype
 ```
 
-Overloading вирішується на етапі compile time за аргументами виклику.  
-Overriding працює через polymorphism: конкретна реалізація вибирається за runtime type обʼєкта.
+Overloading вирішується на compile time за аргументами виклику. Overriding працює через polymorphism: конкретна реалізація вибирається за runtime type обʼєкта.
 
-7. **Поліморфізм через overriding**
+6. **Поліморфізм через overriding**
 
 ```kotlin
 interface Logger {
@@ -17119,7 +17048,7 @@ class CrashlyticsLogger : Logger {
 }
 ```
 
-Клієнтський код:
+Клієнтський код залежить від `Logger`, а не від конкретної реалізації:
 
 ```kotlin
 class LoginUseCase(
@@ -17131,11 +17060,9 @@ class LoginUseCase(
 }
 ```
 
-`LoginUseCase` не знає, яка саме реалізація `Logger` використовується.
+7. **Overloading і default parameters**
 
-8. **Overloading у Kotlin з default parameters**
-
-Kotlin часто дозволяє не створювати багато overload-ів:
+У Kotlin часто краще не створювати багато overload-ів, а використати default parameters:
 
 ```kotlin
 fun loadUsers(
@@ -17146,35 +17073,15 @@ fun loadUsers(
 }
 ```
 
-Виклики:
-
 ```kotlin
 loadUsers()
 loadUsers(forceRefresh = true)
 loadUsers(limit = 100)
 ```
 
-Default parameters часто читабельніші за багато overload-ів.
+Для Java interop можна використати `@JvmOverloads`.
 
-9. **Overloading і @JvmOverloads**
-
-Для Java interop можна використати:
-
-```kotlin
-class UserService {
-    @JvmOverloads
-    fun loadUsers(
-        forceRefresh: Boolean = false,
-        limit: Int = 50
-    ) {
-        TODO()
-    }
-}
-```
-
-Kotlin згенерує overload-и для Java-коду. У Kotlin-коді зазвичай достатньо default parameters.
-
-10. **Типові помилки**
+8. **Типові помилки**
 
 Поганий overloading:
 
@@ -17201,14 +17108,13 @@ class RealRepository : UserRepository {
 override suspend fun getUser(id: String): User
 ```
 
-11. **Практичне правило**
+9. **Практичне правило**
 
-- Overloading використовувати, коли одна операція має кілька зручних способів виклику.
+- Overloading — коли одна операція має кілька зручних способів виклику.
 - Не створювати overload-и, які легко переплутати.
 - У Kotlin часто краще default parameters і named arguments.
-- Overriding використовувати для polymorphism і реалізації contract-ів.
+- Overriding — для polymorphism і реалізації contract-ів.
 - Override має зберігати очікувану поведінку базового contract-а.
-- Для Android-архітектури overriding частіше проявляється через interfaces: repositories, providers, trackers.
 
 **Коротко:** overloading — це одна назва функції з різними параметрами. Overriding — це нова реалізація методу з базового класу або інтерфейсу з тією самою сигнатурою. Overloading дає зручність API, overriding дає поліморфізм.
 
@@ -17564,8 +17470,6 @@ interface DownloadManager {
 }
 ```
 
-Реалізація:
-
 ```kotlin
 class FileDownloadManager : DownloadManager {
     override fun start(
@@ -17582,7 +17486,7 @@ class FileDownloadManager : DownloadManager {
 
 4. **Nested interface не має доступу до instance state**
 
-Вкладений interface у Kotlin не є inner. Він не має доступу до instance зовнішнього типу.
+Вкладений interface у Kotlin не є `inner`. Він не має доступу до instance зовнішнього типу.
 
 ```kotlin
 interface Outer {
@@ -17594,11 +17498,11 @@ interface Outer {
 }
 ```
 
-`Inner` не може напряму читати `id`, бо interface — це type declaration, а не instance-bound object.
+`Inner` не може напряму читати `id`, бо це type declaration, а не instance-bound object.
 
 5. **Interface може наслідувати інший interface**
 
-Окремий, але схожий випадок:
+Це окремий випадок:
 
 ```kotlin
 interface ReadableRepository {
@@ -17614,7 +17518,7 @@ interface UserRepository : ReadableRepository, WritableRepository
 
 Тут `UserRepository` не містить інші інтерфейси всередині, а наслідує їх.
 
-6. **Приклад для Android UI contract**
+6. **Android UI contract**
 
 ```kotlin
 interface ProfileContract {
@@ -17629,7 +17533,7 @@ interface ProfileContract {
 }
 ```
 
-Такий стиль частіше зустрічався в MVP. У сучасному MVVM/MVI зазвичай краще використовувати окремі `UiState`, `UiEvent`, `UiEffect`, але nested contracts все ще можливі.
+Такий стиль часто зустрічався в MVP. У сучасному MVVM/MVI частіше використовують окремі `UiState`, `UiEvent`, `UiEffect`, але nested contracts все ще можливі.
 
 7. **Sealed interface всередині contract**
 
@@ -17644,18 +17548,6 @@ interface LoginContract {
     sealed interface Effect {
         data object NavigateHome : Effect
         data class ShowError(val message: String) : Effect
-    }
-}
-```
-
-Використання:
-
-```kotlin
-fun onEvent(event: LoginContract.Event) {
-    when (event) {
-        is LoginContract.Event.EmailChanged -> Unit
-        is LoginContract.Event.PasswordChanged -> Unit
-        LoginContract.Event.LoginClicked -> Unit
     }
 }
 ```
@@ -17713,7 +17605,7 @@ interface UserChangeListener
 - У Kotlin nested interface звертається через `Outer.Inner`.
 - Nested interface не має доступу до instance state зовнішнього типу.
 
-**Коротко:** інтерфейс у Kotlin може містити інший інтерфейс. Це корисно для callback-ів, contract-ів або згрупованих типів, які мають сенс тільки в контексті зовнішнього API. Але якщо вкладений interface є самостійною абстракцією, краще винести його в top-level тип.
+**Коротко:** інтерфейс у Kotlin може містити інший інтерфейс. Це корисно для callback-ів, contract-ів або згрупованих типів, які мають сенс тільки в контексті зовнішнього API. Якщо вкладений interface є самостійною абстракцією, краще винести його в top-level тип.
 
 </details>
 <details>
@@ -19037,7 +18929,7 @@ val users: List<User> = mutableListOf()
 
 Тип `List` не дозволяє викликати `add/remove` через це посилання, але underlying object може бути mutable.
 
-Тобто `List` — це read-only interface, а не гарантія повної immutability або thread safety.
+`List` — це read-only interface, а не гарантія повної immutability або thread safety.
 
 3. **Race condition**
 
@@ -19071,7 +18963,7 @@ for (item in items) {
 
 Це може кинути `ConcurrentModificationException`, бо колекція змінюється під час iteration.
 
-Правильно:
+Краще:
 
 ```kotlin
 items.removeAll { it == "B" }
@@ -19087,9 +18979,7 @@ for (item in items.toList()) {
 }
 ```
 
-5. **Синхронізація через Mutex**
-
-У coroutines можна використовувати `Mutex`:
+5. **Mutex у coroutines**
 
 ```kotlin
 class UserCache {
@@ -19110,7 +19000,7 @@ class UserCache {
 }
 ```
 
-Це робить доступ послідовним і безпечним для coroutine concurrency.
+`Mutex` робить доступ послідовним і безпечним для coroutine concurrency.
 
 6. **ConcurrentHashMap**
 
@@ -19138,17 +19028,11 @@ class UserCache {
 val listeners = CopyOnWriteArrayList<Listener>()
 ```
 
-Корисно для listeners, коли:
-
-- читання/iteration часті;
-- додавання/видалення рідкісні;
-- треба безпечно ітерувати під час змін.
-
-Але для частих writes це дорого, бо при зміні створюється копія.
+Корисно для listeners, коли читання/iteration часті, а додавання/видалення рідкісні. Для частих writes це дорого, бо при зміні створюється копія.
 
 8. **Immutable state як альтернатива**
 
-У UI state краще не мутувати колекцію inplace:
+У UI state краще не мутувати колекцію inplace.
 
 Погано:
 
@@ -19178,38 +19062,21 @@ _state.update { state ->
 
 Це простіше для Compose, Flow і reasoning про state.
 
-9. **StateFlow і атомарне оновлення**
+9. **Android main thread**
 
-```kotlin
-private val _state = MutableStateFlow(UsersState())
-val state = _state.asStateFlow()
-
-fun addUser(user: User) {
-    _state.update { current ->
-        current.copy(
-            users = current.users + user
-        )
-    }
-}
-```
-
-`update` атомарно бере поточне значення і створює нове. Це краще, ніж мутувати список всередині state.
-
-10. **Android main thread**
-
-Іноді кажуть: “у нас усе на main thread, тому безпечно”. Це частково правда тільки якщо всі read/write справді відбуваються на main thread.
+“У нас усе на main thread” безпечно тільки якщо всі read/write справді відбуваються на main thread.
 
 Проблеми починаються, коли:
 
 - repository працює на `Dispatchers.IO`;
 - callback приходить з background thread;
-- cache використовується з кількох coroutine dispatchers;
+- cache використовується з кількох dispatchers;
 - listener-и викликаються з різних потоків;
 - collection передається між шарами.
 
-Краще не покладатися на припущення, а зробити ownership і threading явними.
+Краще зробити ownership і threading явними.
 
-11. **Практичне правило**
+10. **Практичне правило**
 
 - Звичайні mutable collections не thread-safe.
 - Read-only `List` не гарантує deep immutability.
@@ -19217,9 +19084,8 @@ fun addUser(user: User) {
 - Для UI state краще immutable list/set/map і `copy`.
 - Не мутувати collection під час iteration.
 - Не віддавати mutable collection назовні напряму.
-- Обирати concurrent structure під конкретний сценарій.
 
-**Коротко:** потокобезпечність колекцій — це гарантія коректної роботи при доступі з кількох потоків. У Kotlin/Android звичайні mutable collections такої гарантії не дають, тому для shared state треба використовувати синхронізацію, concurrent collections або immutable state updates.
+**Коротко:** потокобезпечність колекцій — це гарантія коректної роботи при доступі з кількох потоків. У Kotlin/Android звичайні mutable collections такої гарантії не дають, тому для shared state потрібні синхронізація, concurrent collections або immutable state updates.
 
 </details>
 <details>
@@ -22694,7 +22560,7 @@ GlobalScope.launch { }
 
 #### Kotlin
 
-`launch` і `async` — це coroutine builders. `launch` запускає coroutine без результату і повертає `Job`. `async` запускає coroutine з результатом і повертає `Deferred<T>`, з якого результат отримують через `await()`. Практично: `launch` — для side effects, `async` — для паралельних обчислень або запитів із результатом.
+`launch` і `async` — це coroutine builders. `launch` запускає coroutine без результату і повертає `Job`. `async` запускає coroutine з результатом і повертає `Deferred<T>`, з якого результат отримують через `await()`.
 
 1. **launch**
 
@@ -22727,13 +22593,7 @@ val deferred: Deferred<User> = viewModelScope.async {
 val user: User = deferred.await()
 ```
 
-`async` повертає `Deferred<T>`, який є `Job` + майбутній результат.
-
-Результат отримують через:
-
-```kotlin
-deferred.await()
-```
+`async` повертає `Deferred<T>`, тобто `Job` + майбутній результат.
 
 3. **Головна різниця**
 
@@ -22769,15 +22629,11 @@ val posts = async { postRepository.getPosts(id) }
 - collect Flow;
 - fire-and-forget у межах lifecycle scope.
 
-Приклад:
-
 ```kotlin
 fun load(userId: String) {
     viewModelScope.launch {
         _state.value = ProfileState.Loading
-
         val profile = repository.getProfile(userId)
-
         _state.value = ProfileState.Content(profile)
     }
 }
@@ -22785,14 +22641,7 @@ fun load(userId: String) {
 
 5. **Коли використовувати async**
 
-`async` підходить, коли треба:
-
-- отримати результат;
-- запустити кілька незалежних задач паралельно;
-- обʼєднати результати;
-- прискорити loading, якщо запити не залежать один від одного.
-
-Приклад:
+`async` підходить, коли треба отримати результат або запустити кілька незалежних задач паралельно:
 
 ```kotlin
 suspend fun loadDashboard(): Dashboard = coroutineScope {
@@ -22826,7 +22675,7 @@ viewModelScope.launch {
 }
 ```
 
-`async` без `await()` часто означає неправильний builder.
+`async` без `await()` майже завжди означає неправильний builder.
 
 7. **Exception handling у launch**
 
@@ -22838,7 +22687,7 @@ viewModelScope.launch {
 }
 ```
 
-Її треба обробити:
+У UI-коді її зазвичай ловлять всередині coroutine:
 
 ```kotlin
 viewModelScope.launch {
@@ -22852,7 +22701,7 @@ viewModelScope.launch {
 
 8. **Exception handling у async**
 
-Exception з `async` зазвичай проявляється при `await()`:
+Exception з `async` проявляється при `await()`:
 
 ```kotlin
 val deferred = async {
@@ -22866,7 +22715,7 @@ try {
 }
 ```
 
-Але в structured concurrency failure child coroutine все одно впливає на parent scope.
+Але в structured concurrency failure child coroutine все одно може скасувати parent scope.
 
 9. **Structured concurrency**
 
@@ -22909,7 +22758,7 @@ suspend fun loadHome(): HomeData = supervisorScope {
 - Exceptions у `async` обробляти навколо `await`, але памʼятати про parent cancellation.
 - Для паралельних suspend-функцій використовувати `coroutineScope`.
 
-**Коротко:** `launch` запускає coroutine для роботи без результату і повертає `Job`; `async` запускає coroutine з результатом і повертає `Deferred<T>`. У Android `launch` частіше використовують у ViewModel для state updates, а `async` — для паралельних незалежних запитів.
+**Коротко:** `launch` запускає coroutine для роботи без результату і повертає `Job`; `async` запускає coroutine з результатом і повертає `Deferred<T>`. В Android `launch` частіше використовують для state updates, а `async` — для паралельних незалежних запитів.
 
 </details>
 <details>
@@ -23754,15 +23603,14 @@ class App : Application() {
 <application
     android:name=".App"
     android:theme="@style/AppTheme">
-
 </application>
 ```
 
 Коли процес додатка стартує, Android створює екземпляр `App`.
 
-2. **Важливе уточнення: singleton не на весь пристрій**
+2. **Singleton не на весь пристрій**
 
-`Application` — singleton не глобально для всієї системи, а тільки в межах конкретного процесу:
+`Application` — singleton тільки в межах конкретного процесу:
 
 ```text
 app process
@@ -23773,15 +23621,13 @@ app process
 
 3. **Multi-process випадок**
 
-Наприклад:
-
 ```xml
 <service
     android:name=".SyncService"
     android:process=":sync" />
 ```
 
-Тоді може бути така структура:
+Тоді можлива структура:
 
 ```text
 main process
@@ -23791,7 +23637,7 @@ main process
  └── App instance #2
 ```
 
-Тому не можна вважати `Application`, `object` або static state єдиним shared storage між процесами.
+Тому `Application`, Kotlin `object` або static state не можна вважати shared storage між процесами.
 
 4. **Коли викликається Application.onCreate**
 
@@ -23814,7 +23660,7 @@ class App : Application() {
 
 Типові задачі:
 
-- ініціалізація dependency injection;
+- dependency injection setup;
 - crash reporting;
 - logging;
 - analytics setup;
@@ -23822,7 +23668,7 @@ class App : Application() {
 - реєстрація `ActivityLifecycleCallbacks`;
 - lazy initialization глобальних SDK.
 
-Наприклад з Hilt:
+З Hilt:
 
 ```kotlin
 @HiltAndroidApp
@@ -23833,15 +23679,7 @@ class App : Application()
 
 6. **Application context**
 
-З `Application` можна отримати `applicationContext`:
-
-```kotlin
-class UserRepository(
-    private val context: Context
-)
-```
-
-Для long-lived залежностей треба передавати саме application context, а не `Activity`:
+Для long-lived залежностей треба передавати `applicationContext`, а не `Activity` context:
 
 ```kotlin
 @Provides
@@ -23874,12 +23712,12 @@ class App : Application() {
 
 - state може зникнути після process death;
 - `Activity` reference створює memory leak;
-- business logic стає глобальною і неконтрольованою;
+- business logic стає глобальною;
 - тестування ускладнюється.
 
 8. **Application не замінює DI container**
 
-Іноді початківці роблять так:
+Погано для production:
 
 ```kotlin
 class App : Application() {
@@ -23892,7 +23730,7 @@ class App : Application() {
 }
 ```
 
-Для маленького pet-проєкту це може працювати, але в production краще використовувати DI:
+Краще використовувати DI:
 
 ```kotlin
 @Module
@@ -23917,19 +23755,11 @@ new process
 new Application instance
 ```
 
-Тому все критичне треба зберігати в persistent storage:
+Критичний state треба зберігати в database, DataStore, SharedPreferences, files або backend.
 
-- database;
-- DataStore;
-- SharedPreferences;
-- files;
-- backend.
+10. **Application vs Kotlin object**
 
-Не можна покладатися на поля `Application` як на надійне сховище.
-
-10. **Чим Application відрізняється від Kotlin object**
-
-Kotlin `object`:
+Kotlin `object` створюється lazy при першому зверненні:
 
 ```kotlin
 object SessionHolder {
@@ -23937,19 +23767,13 @@ object SessionHolder {
 }
 ```
 
-`Application`:
+`Application` створюється Android framework і має lifecycle/context:
 
 ```kotlin
 class App : Application()
 ```
 
-Обидва можуть виглядати як singleton у процесі, але:
-
-- `Application` створюється Android framework;
-- `Application` має lifecycle callbacks;
-- `Application` має context;
-- `object` створюється lazy при першому зверненні;
-- обидва будуть втрачені при process death.
+Обидва живуть у межах процесу й обидва будуть втрачені при process death.
 
 11. **Практичне правило**
 
@@ -27656,7 +27480,7 @@ adapter.submitList(oldList + newUser)
 
 #### Kotlin
 
-Списки в Android відображають через `RecyclerView` у XML/View-системі або через lazy-контейнери в Jetpack Compose: `LazyColumn`, `LazyRow`, `LazyVerticalGrid`. Для великих або paged списків використовують Paging 3. Вибір залежить від UI stack, обсягу даних і вимог до loading/error/empty states.
+Списки в Android відображають через `RecyclerView` у XML/View-системі або через lazy-контейнери в Jetpack Compose: `LazyColumn`, `LazyRow`, `LazyVerticalGrid`. Для великих або paged списків використовують Paging 3.
 
 1. **RecyclerView у View/XML**
 
@@ -27686,17 +27510,13 @@ binding.recyclerView.adapter = adapter
 adapter.submitList(users)
 ```
 
-Для звичайних списків краще `ListAdapter` + `DiffUtil`, а не ручний `notifyDataSetChanged()`.
+Для production списків краще `ListAdapter` + `DiffUtil`, а не `notifyDataSetChanged()`.
 
-2. **Основні layout-и RecyclerView**
-
-Вертикальний список:
+2. **LayoutManager-и**
 
 ```kotlin
 recyclerView.layoutManager = LinearLayoutManager(context)
 ```
-
-Горизонтальний:
 
 ```kotlin
 recyclerView.layoutManager = LinearLayoutManager(
@@ -27706,15 +27526,15 @@ recyclerView.layoutManager = LinearLayoutManager(
 )
 ```
 
-Grid:
-
 ```kotlin
 recyclerView.layoutManager = GridLayoutManager(context, 2)
 ```
 
-3. **Paging 3 для великих списків**
+`LinearLayoutManager` — вертикальний/горизонтальний список, `GridLayoutManager` — сітка.
 
-Якщо дані приходять сторінками або їх дуже багато:
+3. **Paging 3**
+
+Якщо дані приходять сторінками або їх дуже багато, використовують `PagingDataAdapter`:
 
 ```kotlin
 class UserPagingAdapter :
@@ -27739,14 +27559,12 @@ Fragment:
 ```kotlin
 viewLifecycleOwner.lifecycleScope.launch {
     repeatOnLifecycle(Lifecycle.State.STARTED) {
-        viewModel.users.collectLatest { pagingData ->
-            adapter.submitData(pagingData)
-        }
+        viewModel.users.collectLatest(adapter::submitData)
     }
 }
 ```
 
-4. **Load/Error/Retry states**
+4. **Loading/Error/Empty states**
 
 ```kotlin
 adapter.addLoadStateListener { loadState ->
@@ -27759,7 +27577,7 @@ binding.retryButton.setOnClickListener {
 }
 ```
 
-Список без loading/error/empty state — неповний production UI.
+Production list має мати loading, error, empty і retry states.
 
 5. **Compose LazyColumn**
 
@@ -27772,7 +27590,7 @@ fun UserListScreen(
     LazyColumn {
         items(
             items = users,
-            key = { user -> user.id }
+            key = { it.id }
         ) { user ->
             UserItem(
                 user = user,
@@ -27783,11 +27601,9 @@ fun UserListScreen(
 }
 ```
 
-`key` важливий для стабільної identity item-а при insert/delete/sort/filter.
+`key` потрібен для стабільної identity item-а при insert/delete/sort/filter.
 
 6. **Compose LazyRow і Grid**
-
-Горизонтальний список:
 
 ```kotlin
 LazyRow {
@@ -27797,12 +27613,8 @@ LazyRow {
 }
 ```
 
-Grid:
-
 ```kotlin
-LazyVerticalGrid(
-    columns = GridCells.Fixed(2)
-) {
+LazyVerticalGrid(columns = GridCells.Fixed(2)) {
     items(products, key = { it.id }) { product ->
         ProductCard(product)
     }
@@ -27818,48 +27630,19 @@ fun UserPagingScreen(viewModel: UserViewModel) {
 
     LazyColumn {
         items(users.itemCount) { index ->
-            users[index]?.let { user ->
-                UserItem(user)
-            }
+            users[index]?.let { UserItem(it) }
         }
+    }
+
+    when (users.loadState.refresh) {
+        is LoadState.Loading -> LoadingContent()
+        is LoadState.Error -> ErrorContent(onRetry = { users.retry() })
+        is LoadState.NotLoading -> Unit
     }
 }
 ```
 
-LoadState:
-
-```kotlin
-when (users.loadState.refresh) {
-    is LoadState.Loading -> LoadingContent()
-    is LoadState.Error -> ErrorContent(onRetry = { users.retry() })
-    is LoadState.NotLoading -> Unit
-}
-```
-
-8. **Empty state**
-
-View/XML:
-
-```kotlin
-binding.emptyView.isVisible = users.isEmpty()
-binding.recyclerView.isVisible = users.isNotEmpty()
-```
-
-Compose:
-
-```kotlin
-if (users.isEmpty()) {
-    EmptyContent()
-} else {
-    LazyColumn {
-        items(users, key = { it.id }) { user ->
-            UserItem(user)
-        }
-    }
-}
-```
-
-9. **Що не робити**
+8. **Що не робити**
 
 Погано у View-системі:
 
@@ -27873,15 +27656,13 @@ items.forEach { item ->
 
 ```kotlin
 Column {
-    users.forEach { user ->
-        UserItem(user)
-    }
+    users.forEach { user -> UserItem(user) }
 }
 ```
 
 Для великих списків потрібні `RecyclerView` або lazy-контейнери.
 
-10. **Практичне правило**
+9. **Практичне правило**
 
 - XML/View список — `RecyclerView`.
 - Простий RecyclerView список — `ListAdapter`.
@@ -27889,9 +27670,9 @@ Column {
 - Compose список — `LazyColumn` або `LazyRow`.
 - Compose grid — `LazyVerticalGrid`.
 - Для dynamic lists задавати stable `key`.
-- Loading, error, empty і retry states мають бути частиною UI.
+- Loading/error/empty/retry states — частина нормального UI.
 
-**Коротко:** у View-системі списки відображають через `RecyclerView` з `Adapter`/`ListAdapter`/`PagingDataAdapter`. У Compose — через `LazyColumn`, `LazyRow` або lazy grids. Для великих або remote списків використовують Paging 3.
+**Коротко:** у View-системі списки відображають через `RecyclerView` з `ListAdapter` або `PagingDataAdapter`. У Compose — через `LazyColumn`, `LazyRow` або lazy grids. Для великих або remote списків використовують Paging 3.
 
 </details>
 <details>
