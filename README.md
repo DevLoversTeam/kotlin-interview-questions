@@ -6314,10 +6314,7 @@ val shared = repository.observeData()
 
 #### Kotlin
 
-`Flow` і `LiveData` обидва можуть передавати значення в часі, але це різні
-інструменти. `LiveData` — Android lifecycle-aware observable holder. `Flow` —
-частина Kotlin Coroutines для асинхронних stream-ів, яка не привʼязана до
-Android і краще підходить для domain/data layers.
+`Flow` і `LiveData` обидва передають значення в часі, але це різні інструменти. `LiveData` — Android lifecycle-aware observable holder. `Flow` — coroutine-native stream API, не привʼязаний до Android і краще підходить для data/domain layers.
 
 1. **LiveData**
 
@@ -6332,7 +6329,7 @@ fun update(user: User) {
 }
 ```
 
-Головна перевага `LiveData` — lifecycle awareness:
+Головна перевага — lifecycle awareness:
 
 ```kotlin
 viewModel.user.observe(viewLifecycleOwner) { user ->
@@ -6340,34 +6337,24 @@ viewModel.user.observe(viewLifecycleOwner) { user ->
 }
 ```
 
-Observer отримує оновлення лише коли `LifecycleOwner` у відповідному active
-state. Це зручно для класичного Android View-based UI.
+Observer отримує оновлення лише коли `LifecycleOwner` у відповідному active state.
 
 2. **Flow**
 
-`Flow<T>` — це асинхронний stream значень:
+`Flow<T>` — асинхронний stream значень:
 
 ```kotlin
 fun observeUser(): Flow<User> =
     userDao.observeUser()
 ```
 
-Він не залежить від Android lifecycle і може використовуватись у будь-якому
-Kotlin-коді: backend, CLI, shared KMM module, repository, use case.
-
-```kotlin
-viewModelScope.launch {
-    repository.observeUser().collect { user ->
-        render(user)
-    }
-}
-```
+Він не залежить від Android lifecycle і може використовуватись у repository, use case, KMM shared module, backend або будь-якому Kotlin-коді.
 
 3. **Lifecycle**
 
 `LiveData` має lifecycle-awareness вбудовано.
 
-`Flow` сам по собі lifecycle не знає. В Android його треба збирати правильно:
+`Flow` сам по собі lifecycle не знає. В Android його треба збирати через `repeatOnLifecycle`:
 
 ```kotlin
 viewLifecycleOwner.lifecycleScope.launch {
@@ -6379,12 +6366,11 @@ viewLifecycleOwner.lifecycleScope.launch {
 }
 ```
 
-`repeatOnLifecycle` запускає collection, коли lifecycle входить у потрібний
-стан, і скасовує collection, коли виходить.
+`repeatOnLifecycle` запускає collection у потрібному state і скасовує її при виході з нього.
 
 4. **Threading**
 
-У `LiveData` є обмеження навколо main thread:
+У `LiveData` є main-thread модель:
 
 ```kotlin
 _user.value = user      // main thread
@@ -6401,7 +6387,7 @@ repository.observeUser()
     }
 ```
 
-Це більш гнучко і краще вкладається в coroutine architecture.
+Це гнучкіше для coroutine architecture.
 
 5. **Оператори**
 
@@ -6416,8 +6402,7 @@ repository.observeUsers()
     .catch { emit(UiState.Error) }
 ```
 
-У `LiveData` теж є трансформації, наприклад `map` і `switchMap`, але вони
-обмеженіші й менш зручні для складних asynchronous pipelines.
+У `LiveData` є `map` і `switchMap`, але вони обмеженіші для складних async pipelines.
 
 6. **Cold vs hot**
 
@@ -6431,11 +6416,9 @@ val flow = flow {
 
 Він стартує при `collect`.
 
-`LiveData` більше схожий на hot observable holder: він має останнє значення і
-живе як обʼєкт незалежно від конкретного observer-а.
+`LiveData` більше схожий на hot observable holder: має останнє значення і живе як обʼєкт незалежно від конкретного observer-а.
 
-Якщо в `Flow` потрібна модель state holder, зазвичай використовують
-`StateFlow`:
+Якщо у Flow потрібна модель state holder, використовують `StateFlow`:
 
 ```kotlin
 val state: StateFlow<UiState> =
@@ -6450,8 +6433,7 @@ val state: StateFlow<UiState> =
 
 7. **Data/domain layer**
 
-У сучасній Kotlin/Android архітектурі repository і use case краще не повинні
-залежати від Android API:
+У сучасній архітектурі repository і use case краще не повинні залежати від Android API:
 
 ```kotlin
 interface UserRepository {
@@ -6467,49 +6449,38 @@ interface UserRepository {
 }
 ```
 
-Причина проста: `Flow` — Kotlin API, а `LiveData` — Android API. Domain/data
-layer з `Flow` легше тестувати, переносити і використовувати поза Android UI.
+`Flow` легше тестувати, переносити і використовувати поза Android UI.
 
 8. **Interop**
 
-Можна конвертувати `Flow` у `LiveData`:
+Flow у LiveData:
 
 ```kotlin
 val userLiveData: LiveData<User> =
     repository.observeUser().asLiveData()
 ```
 
-І `LiveData` у `Flow`:
+LiveData у Flow:
 
 ```kotlin
 val userFlow: Flow<User> =
     userLiveData.asFlow()
 ```
 
-Це корисно під час міграції зі старого коду на coroutine/Flow-based підхід.
+Це корисно під час міграції legacy-коду.
 
 9. **Що краще для нового коду**
 
-Для нового Kotlin/Android коду зазвичай краще:
+Для нового Kotlin/Android коду зазвичай:
 
 - repository/use case — `Flow`;
 - ViewModel state — `StateFlow`;
 - one-time events — `SharedFlow`;
-- legacy XML/View UI може продовжувати використовувати `LiveData`, якщо проєкт
-  уже побудований навколо нього.
+- legacy XML/View UI може залишатися на `LiveData`, якщо проєкт уже так побудований.
 
 У Jetpack Compose `StateFlow` зазвичай природніший вибір, ніж `LiveData`.
 
-10. **Практичне правило**
-
-`LiveData` — хороший lifecycle-aware holder для класичного Android UI.
-`Flow` — більш універсальний, coroutine-native stream API для data/domain
-логіки і складних asynchronous pipelines.
-
-**Коротко:** `LiveData` привʼязаний до Android lifecycle, а `Flow` — до Kotlin
-Coroutines. У сучасній архітектурі `Flow` краще тримати в data/domain layers, а
-в UI перетворювати його на `StateFlow`, `SharedFlow` або `LiveData` залежно від
-потреб проєкту.
+**Коротко:** `LiveData` привʼязаний до Android lifecycle, а `Flow` — до Kotlin Coroutines. У сучасній архітектурі `Flow` краще тримати в data/domain layers, а в UI перетворювати його на `StateFlow`, `SharedFlow` або `LiveData` залежно від потреб проєкту.
 
 </details>
 <details>
@@ -7816,15 +7787,11 @@ UserMapper.map(dto)
 
 #### Kotlin
 
-Делегування — це підхід, коли обʼєкт передає частину своєї поведінки іншому
-обʼєкту. У Kotlin делегування підтримується на рівні мови: є делегування
-інтерфейсів через `by` і делеговані властивості (`lazy`, `observable`, custom
-delegates).
+Делегування — це підхід, коли обʼєкт передає частину своєї поведінки іншому обʼєкту. У Kotlin делегування підтримується на рівні мови: є делегування інтерфейсів через `by` і делеговані властивості (`lazy`, `observable`, custom delegates).
 
 1. **Ідея делегування**
 
-Замість наслідування можна винести поведінку в окремий обʼєкт і делегувати йому
-виклики.
+Замість наслідування можна винести поведінку в окремий обʼєкт і делегувати йому виклики.
 
 ```kotlin
 interface Logger {
@@ -7853,10 +7820,9 @@ class UserService(
 }
 ```
 
-`UserService` формально реалізує `Logger`, але методи `Logger` делегуються
-обʼєкту `logger`.
+`UserService` формально реалізує `Logger`, але методи `Logger` делегуються обʼєкту `logger`.
 
-Це означає, що компілятор згенерує forwarding-код:
+Компілятор фактично генерує forwarding-код:
 
 ```kotlin
 override fun log(message: String) {
@@ -7864,11 +7830,9 @@ override fun log(message: String) {
 }
 ```
 
-Але писати його вручну не потрібно.
+3. **Чому це краще за inheritance**
 
-3. **Навіщо це краще за inheritance**
-
-Делегування часто краще за наслідування, бо воно базується на composition:
+Делегування базується на composition:
 
 ```kotlin
 class FileRepository(
@@ -7876,8 +7840,6 @@ class FileRepository(
     private val logger: Logger
 )
 ```
-
-Обʼєкт отримує поведінку через залежності, а не через жорстку ієрархію класів.
 
 Переваги:
 
@@ -7902,7 +7864,7 @@ class PrefixLogger(
 }
 ```
 
-Тут усі методи `Logger` делегуються, але `log` має custom behavior.
+Тут `Logger` делегується, але `log` має custom behavior.
 
 5. **Делеговані властивості**
 
@@ -7914,15 +7876,9 @@ val config: Config by lazy {
 }
 ```
 
-`lazy` ініціалізує значення тільки при першому доступі:
+`lazy` ініціалізує значення тільки при першому доступі.
 
-```kotlin
-println(config) // тут loadConfig() виконається вперше
-```
-
-Це корисно для дорогих або відкладених обчислень.
-
-6. **observable**
+6. **observable і vetoable**
 
 ```kotlin
 var username: String by Delegates.observable("") { property, oldValue, newValue ->
@@ -7932,7 +7888,7 @@ var username: String by Delegates.observable("") { property, oldValue, newValue 
 
 `observable` дозволяє реагувати на зміну property.
 
-Є також `vetoable`, який може відхилити нове значення:
+`vetoable` може відхилити нове значення:
 
 ```kotlin
 var age: Int by Delegates.vetoable(0) { _, _, newValue ->
@@ -7960,16 +7916,14 @@ class TrimmedString {
 var name: String by TrimmedString()
 ```
 
-Тепер:
-
 ```kotlin
 name = "  Kotlin  "
 println(name) // Kotlin
 ```
 
-8. **by lazy у production-коді**
+8. **by lazy і thread-safety**
 
-`lazy` має різні режими thread-safety:
+`lazy` має різні режими:
 
 ```kotlin
 val value by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
@@ -7977,15 +7931,9 @@ val value by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
 }
 ```
 
-Режими:
-
 - `SYNCHRONIZED` — thread-safe за замовчуванням;
-- `PUBLICATION` — кілька потоків можуть ініціалізувати, але збережеться одне
-  значення;
-- `NONE` — без thread-safety, швидше, але тільки якщо доступ з одного thread.
-
-Для Android UI-коду часто достатньо `NONE`, якщо property використовується лише
-на main thread. Але це треба робити свідомо.
+- `PUBLICATION` — кілька потоків можуть ініціалізувати, але збережеться одне значення;
+- `NONE` — без thread-safety, швидше, але тільки для одного thread.
 
 9. **Делегування в Android**
 
@@ -7995,16 +7943,13 @@ val value by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
 private val viewModel: UserViewModel by viewModels()
 ```
 
-або:
-
 ```kotlin
 private val binding by lazy {
     ActivityMainBinding.inflate(layoutInflater)
 }
 ```
 
-`by viewModels()` — це delegate, який керує отриманням `ViewModel` з правильним
-lifecycle owner-ом.
+`by viewModels()` — delegate, який отримує `ViewModel` з правильним lifecycle owner-ом.
 
 10. **Типові помилки**
 
@@ -8012,17 +7957,9 @@ lifecycle owner-ом.
 - Ховати складну бізнес-логіку в property delegate без потреби.
 - Використовувати `lazy` для обʼєктів, які треба явно очищати.
 - Забувати про thread-safety режим `lazy`.
-- Делегувати занадто багато інтерфейсів одному класу і робити його нечитабельним.
+- Делегувати занадто багато інтерфейсів одному класу.
 
-11. **Практичне правило**
-
-Делегування використовують, коли обʼєкт має використати поведінку іншого
-обʼєкта без наслідування. Для поведінки — interface delegation через `by`. Для
-властивостей — property delegates типу `lazy`, `observable` або custom delegate.
-
-**Коротко:** delegation у Kotlin — це language-level підтримка composition. Вона
-дозволяє повторно використовувати поведінку без жорсткого inheritance і робить
-код гнучкішим, тестованішим і простішим для заміни реалізацій.
+**Коротко:** delegation у Kotlin — це language-level підтримка composition. Вона дозволяє повторно використовувати поведінку без жорсткого inheritance і робить код гнучкішим, тестованішим і простішим для заміни реалізацій.
 
 </details>
 <details>
