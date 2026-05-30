@@ -18388,7 +18388,7 @@ val user: User = json.decode<User>(rawJson)
 
 #### Kotlin
 
-Type erasure — це механізм, через який інформація про generic type parameters здебільшого стирається під час компіляції і недоступна в runtime. Наприклад, `List<String>` і `List<Int>` у runtime виглядають приблизно як просто `List`. Це успадковано з JVM і потрібно для сумісності з Java.
+Type erasure — це механізм, через який інформація про generic type parameters здебільшого стирається під час компіляції і недоступна в runtime. Наприклад, `List<String>` і `List<Int>` у runtime виглядають приблизно як просто `List`.
 
 1. **Базовий приклад**
 
@@ -18431,21 +18431,11 @@ List
 
 Generic type parameter `T` стирається або замінюється upper bound-ом.
 
-Наприклад:
-
-```kotlin
-class Box<T>(val value: T)
-```
-
-у runtime не знає конкретний `T` для кожного instance.
-
 3. **Чому type erasure виникає**
 
 Основна причина — JVM backward compatibility з Java.
 
-Java generics були додані пізніше, ніж сама Java, і реалізовані через erasure, щоб старий bytecode і старі libraries продовжили працювати.
-
-Kotlin на JVM має бути сумісний із JVM model, тому теж має type erasure.
+Java generics були додані пізніше, ніж сама Java, і реалізовані через erasure, щоб старий bytecode і старі libraries продовжили працювати. Kotlin на JVM має бути сумісний із цією model.
 
 4. **Проблема з is check**
 
@@ -18459,7 +18449,7 @@ fun handle(value: Any) {
 }
 ```
 
-Можна перевірити тільки raw/container type:
+Можна перевірити тільки container type:
 
 ```kotlin
 fun handle(value: Any) {
@@ -18487,8 +18477,6 @@ val strings = (value as? List<*>)
     ?.filterIsInstance<String>()
 ```
 
-Але це вже створює новий список тільки з елементів потрібного типу.
-
 6. **Generic function і T**
 
 Погано:
@@ -18501,7 +18489,7 @@ fun <T> isOfType(value: Any): Boolean {
 
 Так не можна, бо `T` стертий у runtime.
 
-7. **Reified як рішення для inline functions**
+7. **Reified як рішення**
 
 Kotlin має `reified` type parameters для `inline` functions:
 
@@ -18532,8 +18520,6 @@ fun <T> decode(
 }
 ```
 
-Використання:
-
 ```kotlin
 val user = decode(json, User::class.java)
 ```
@@ -18546,15 +18532,13 @@ inline fun <reified T> decode(json: String): T {
 }
 ```
 
-Використання:
-
 ```kotlin
 val user: User = decode<User>(json)
 ```
 
-9. **Але reified не вирішує все**
+9. **Reified не вирішує все**
 
-`reified` допомагає з самим типом `T`, але nested generics усе ще можуть бути складними:
+`reified` допомагає з самим типом `T`, але nested generics можуть бути складними:
 
 ```kotlin
 decode<List<User>>(json)
@@ -18580,39 +18564,15 @@ handle(List)
 
 Це JVM signature clash.
 
-Краще:
-
-```kotlin
-fun handleStrings(items: List<String>) {}
-fun handleInts(items: List<Int>) {}
-```
-
-або додати додатковий параметр/інший contract.
-
-11. **Star projection**
-
-Якщо тип елементів невідомий:
-
-```kotlin
-fun printList(items: List<*>) {
-    items.forEach { item ->
-        println(item)
-    }
-}
-```
-
-`List<*>` безпечніше, ніж raw `List`, бо Kotlin не дозволить додати туди елемент невідомого типу.
-
-12. **Практичне правило**
+11. **Практичне правило**
 
 - Не перевіряти `value is List<String>` — використовувати `List<*>`.
 - Обережно з `as List<T>` — це unchecked cast.
 - Для runtime type checks generic `T` використовувати `inline reified`.
 - Для JSON і nested generics використовувати serializers/type tokens.
 - Не створювати overload-и, які після erasure мають однакову JVM signature.
-- Памʼятати, що compile-time type safety не означає повну runtime type information.
 
-**Коротко:** type erasure — це стирання generic type information у runtime на JVM. Він виникає через сумісність із Java/JVM. Kotlin компенсує частину обмежень через `reified`, star projections і type-safe compile-time checks, але generic типи в runtime все одно треба обробляти обережно.
+**Коротко:** type erasure — це стирання generic type information у runtime на JVM. Він виникає через сумісність із Java/JVM. Kotlin частково компенсує це через `reified`, star projections і compile-time type safety, але generic типи в runtime треба обробляти обережно.
 
 </details>
 <details>
@@ -27237,19 +27197,14 @@ notifyItemRemoved(position)
 notifyItemChanged(position)
 ```
 
-Краще використовувати `DiffUtil`/`ListAdapter`, щоб RecyclerView отримував точні зміни: insert, remove, move, change. `notifyDataSetChanged()` змушує вважати, що змінився весь список.
+Краще використовувати `DiffUtil`/`ListAdapter`, щоб RecyclerView отримував точні зміни. `notifyDataSetChanged()` змушує вважати, що змінився весь список.
 
 9. **ItemAnimator і ItemDecoration**
 
-`ItemAnimator` анімує додавання, видалення, переміщення і зміну item-ів:
+`ItemAnimator` анімує додавання, видалення, переміщення і зміну item-ів. `ItemDecoration` додає dividers, spacing або custom drawing без зміни item layout.
 
 ```kotlin
 recyclerView.itemAnimator = DefaultItemAnimator()
-```
-
-`ItemDecoration` додає dividers, spacing або custom drawing:
-
-```kotlin
 recyclerView.addItemDecoration(
     DividerItemDecoration(context, RecyclerView.VERTICAL)
 )
@@ -27282,16 +27237,6 @@ binding.root.setOnClickListener {
 ```
 
 Або передавати конкретний item у `bind()`, якщо adapter працює з immutable snapshots.
-
-12. **Практичне правило**
-
-- RecyclerView створює тільки потрібні `ViewHolder`-и.
-- `ViewHolder`-и перевикористовуються при scroll.
-- Adapter створює і bind-ить item UI.
-- LayoutManager відповідає за розміщення.
-- DiffUtil/ListAdapter дає точкові оновлення.
-- `bind()` має бути швидким і повністю встановлювати state.
-- Для різних item layouts використовувати `viewType`.
 
 **Коротко:** RecyclerView працює через reuse `ViewHolder`-ів, layout delegation у `LayoutManager`, cache/pool механізми і точкові adapter updates. Саме recycling і DiffUtil/ListAdapter роблять його ефективним для великих списків.
 
