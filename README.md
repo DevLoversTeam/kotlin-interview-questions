@@ -19913,13 +19913,11 @@ catch (error: CancellationException) {
 
 #### Kotlin
 
-Складність алгоритмів — це оцінка того, як ростуть час виконання або використання памʼяті алгоритму зі збільшенням розміру вхідних даних. Зазвичай її описують через Big O notation: `O(1)`, `O(log n)`, `O(n)`, `O(n log n)`, `O(n²)` тощо.
+Складність алгоритмів — це оцінка того, як ростуть час виконання або використання памʼяті алгоритму зі збільшенням розміру вхідних даних. Зазвичай її описують через Big O notation: `O(1)`, `O(log n)`, `O(n)`, `O(n log n)`, `O(n²)`.
 
 1. **Навіщо це потрібно**
 
 Складність допомагає зрозуміти, чи буде рішення працювати на великих даних.
-
-Наприклад:
 
 ```kotlin
 fun containsUser(users: List<User>, id: String): Boolean {
@@ -19929,19 +19927,15 @@ fun containsUser(users: List<User>, id: String): Boolean {
 
 Це `O(n)`, бо в гіршому випадку треба пройти весь список.
 
-Якщо користувачів 10 — не проблема. Якщо 1 000 000 — вже важливо.
-
 2. **O(1) — константна складність**
 
-Час не залежить від розміру input.
+Час не залежить від розміру input:
 
 ```kotlin
 fun firstItem(items: List<String>): String? {
     return items.firstOrNull()
 }
 ```
-
-Доступ до першого елемента — `O(1)`.
 
 Також:
 
@@ -19953,14 +19947,12 @@ val user = usersById[id]
 
 3. **O(n) — лінійна складність**
 
-Час росте пропорційно кількості елементів.
+Час росте пропорційно кількості елементів:
 
 ```kotlin
 fun findUser(users: List<User>, id: String): User? {
     for (user in users) {
-        if (user.id == id) {
-            return user
-        }
+        if (user.id == id) return user
     }
     return null
 }
@@ -19970,22 +19962,18 @@ fun findUser(users: List<User>, id: String): User? {
 
 4. **O(n²) — квадратична складність**
 
-Зазвичай виникає при вкладених циклах.
+Зазвичай виникає при вкладених циклах:
 
 ```kotlin
 fun hasDuplicates(items: List<String>): Boolean {
     for (i in items.indices) {
         for (j in i + 1 until items.size) {
-            if (items[i] == items[j]) {
-                return true
-            }
+            if (items[i] == items[j]) return true
         }
     }
     return false
 }
 ```
-
-Для 10 000 елементів це може бути дуже дорого.
 
 Краще через `Set`:
 
@@ -19993,9 +19981,7 @@ fun hasDuplicates(items: List<String>): Boolean {
 fun hasDuplicates(items: List<String>): Boolean {
     val seen = mutableSetOf<String>()
     for (item in items) {
-        if (!seen.add(item)) {
-            return true
-        }
+        if (!seen.add(item)) return true
     }
     return false
 }
@@ -20037,13 +20023,11 @@ val sorted = users.sortedBy { it.name }
 
 Більшість загальних алгоритмів сортування працюють близько до `O(n log n)`.
 
-7. **Time complexity vs Space complexity**
+7. **Time vs Space complexity**
 
 Time complexity — скільки часу/операцій потрібно.
 
 Space complexity — скільки додаткової памʼяті потрібно.
-
-Наприклад:
 
 ```kotlin
 fun copyUsers(users: List<User>): List<User> {
@@ -20054,7 +20038,7 @@ fun copyUsers(users: List<User>): List<User> {
 Time: `O(n)`  
 Space: `O(n)`, бо створюється копія списку.
 
-8. **Приклад List vs Set**
+8. **List vs Set**
 
 ```kotlin
 val selectedIds: List<String> = ...
@@ -20063,15 +20047,7 @@ val isSelected = selectedIds.contains(user.id)
 
 `List.contains` — `O(n)`.
 
-Якщо перевірка виконується для кожного item у великому списку:
-
-```kotlin
-users.map { user ->
-    user.copy(isSelected = selectedIds.contains(user.id))
-}
-```
-
-це може стати `O(n * m)`.
+Якщо перевірка виконується для кожного item у великому списку, це може стати `O(n * m)`.
 
 Краще:
 
@@ -20094,35 +20070,9 @@ O(2n) -> O(n)
 O(100n) -> O(n)
 ```
 
-Але в реальному Android performance constants теж можуть мати значення, особливо на main thread.
+Але в реальному Android performance constants теж важливі, особливо на main thread.
 
-Наприклад, `O(n)` з важким image processing у кожному item може лагати сильніше, ніж `O(n log n)` легкого сортування.
-
-10. **Android приклади**
-
-Погано для Compose item:
-
-```kotlin
-@Composable
-fun UserItem(user: User, selectedIds: List<String>) {
-    val selected = selectedIds.contains(user.id)
-    Text(user.name)
-}
-```
-
-Якщо item-ів багато, кожен item робить лінійний пошук.
-
-Краще:
-
-```kotlin
-@Composable
-fun UserItem(user: User, selectedIds: Set<String>) {
-    val selected = user.id in selectedIds
-    Text(user.name)
-}
-```
-
-11. **Практичне правило**
+10. **Практичне правило**
 
 - Один прохід по списку — зазвичай `O(n)`.
 - Вкладений цикл по тому самому списку — часто `O(n²)`.
@@ -20131,7 +20081,7 @@ fun UserItem(user: User, selectedIds: Set<String>) {
 - Sorting — часто `O(n log n)`.
 - Для UI/main thread важливі не тільки Big O, а й реальна вартість операцій.
 
-**Коротко:** складність алгоритмів показує, як швидко росте вартість виконання або памʼяті при збільшенні input. У Android це напряму впливає на плавність UI, scroll performance, роботу з великими списками, кешами й пошуком.
+**Коротко:** складність алгоритмів показує, як швидко росте вартість виконання або памʼяті при збільшенні input. В Android це впливає на плавність UI, scroll performance, роботу з великими списками, кешами й пошуком.
 
 </details>
 <details>
