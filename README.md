@@ -6202,14 +6202,11 @@ class UserViewModel(
 
 #### Kotlin
 
-`Flow`, `StateFlow` і `SharedFlow` — це API для асинхронних потоків даних, але
-вони вирішують різні задачі. Якщо коротко: `Flow` зазвичай cold stream,
-`StateFlow` — hot stream зі станом і останнім значенням, `SharedFlow` — hot
-stream для подій або broadcast-сценаріїв.
+`Flow`, `StateFlow` і `SharedFlow` — це API для асинхронних потоків даних, але вони вирішують різні задачі. Коротко: `Flow` зазвичай cold stream, `StateFlow` — hot stream зі станом і останнім значенням, `SharedFlow` — hot stream для подій або broadcast.
 
 1. **Flow**
 
-`Flow<T>` — це асинхронний потік значень, який за замовчуванням є cold.
+`Flow<T>` — асинхронний потік значень, який за замовчуванням є cold:
 
 ```kotlin
 fun observeUsers(): Flow<List<User>> = flow {
@@ -6217,24 +6214,19 @@ fun observeUsers(): Flow<List<User>> = flow {
 }
 ```
 
-Cold означає, що код всередині flow не виконується, доки хтось не викличе
-`collect`:
+Cold означає, що код всередині flow не виконується, доки хтось не викличе `collect`:
 
 ```kotlin
-val usersFlow = repository.observeUsers()
-
-usersFlow.collect { users ->
+repository.observeUsers().collect { users ->
     println(users)
 }
 ```
 
-Кожен collector зазвичай запускає flow заново. Це добре для pipeline-ів,
-запитів, трансформацій і роботи з джерелами, які мають виконуватись під час
-collection.
+Кожен collector зазвичай запускає flow заново. Це добре для pipeline-ів, repository APIs, трансформацій і асинхронних джерел даних.
 
 2. **StateFlow**
 
-`StateFlow<T>` — це hot flow, який завжди має поточне значення.
+`StateFlow<T>` — hot flow, який завжди має поточне значення:
 
 ```kotlin
 private val _state = MutableStateFlow<UiState>(UiState.Loading)
@@ -6245,28 +6237,11 @@ fun update(user: User) {
 }
 ```
 
-Його головна модель — state holder. Новий collector одразу отримує останнє
-значення:
-
-```kotlin
-viewModel.state.collect { state ->
-    render(state)
-}
-```
-
-`StateFlow` добре підходить для UI-state:
-
-- loading;
-- content;
-- error;
-- selected item;
-- filter state;
-- screen model.
+Новий collector одразу отримує останнє значення. Тому `StateFlow` добре підходить для UI-state: loading, content, error, selected item, filters, screen model.
 
 3. **SharedFlow**
 
-`SharedFlow<T>` — це hot flow для broadcast-подій. Він не зобовʼязаний мати
-поточний стан.
+`SharedFlow<T>` — hot flow для подій або broadcast-сценаріїв. Він не зобовʼязаний мати поточний стан:
 
 ```kotlin
 private val _events = MutableSharedFlow<UiEvent>()
@@ -6277,67 +6252,35 @@ suspend fun showError() {
 }
 ```
 
-`SharedFlow` корисний для one-time events:
-
-- snackbar;
-- navigation;
-- toast;
-- analytics event;
-- одноразові UI-команди;
-- broadcast між кількома subscribers.
+Типові сценарії: snackbar, navigation, toast, analytics event, одноразові UI-команди.
 
 4. **Hot vs cold**
 
-`Flow` зазвичай cold:
+`Flow` зазвичай cold: кожен `collect` стартує виконання заново.
 
-```kotlin
-val flow = flow {
-    println("Started")
-    emit(1)
-}
-```
+`StateFlow` і `SharedFlow` — hot: вони існують незалежно від collectors, і значення можна оновлювати навіть коли зараз ніхто не слухає.
 
-Кожен `collect` стартує виконання заново.
+5. **Останнє значення і replay**
 
-`StateFlow` і `SharedFlow` — hot:
-
-```kotlin
-private val state = MutableStateFlow(0)
-private val events = MutableSharedFlow<String>()
-```
-
-Вони існують незалежно від collectors. Значення можна оновлювати навіть тоді,
-коли зараз ніхто не слухає.
-
-5. **StateFlow зберігає останнє значення**
+`StateFlow` завжди зберігає останній state:
 
 ```kotlin
 val state = MutableStateFlow(0)
-
 state.value = 1
 state.value = 2
 ```
 
 Новий collector одразу отримає `2`.
 
-Це ключова відмінність від звичайного `SharedFlow`, який без replay не
-обовʼязково віддасть минулі events новому collector-у.
-
-6. **SharedFlow і replay**
-
-`SharedFlow` можна налаштувати через `replay`:
+`SharedFlow` може мати `replay`:
 
 ```kotlin
 val shared = MutableSharedFlow<String>(replay = 1)
-
-shared.emit("Last event")
 ```
 
-Новий collector отримає останнє replay-значення. Але якщо потрібна саме модель
-поточного стану, зазвичай краще використовувати `StateFlow`, а не
-`SharedFlow(replay = 1)`.
+Але якщо потрібна саме модель поточного стану, краще використовувати `StateFlow`, а не `SharedFlow(replay = 1)`.
 
-7. **Типовий ViewModel-приклад**
+6. **Типовий ViewModel-приклад**
 
 ```kotlin
 class UserViewModel(
@@ -6364,56 +6307,33 @@ class UserViewModel(
 }
 ```
 
-Тут `StateFlow` тримає стан екрана, а `SharedFlow` відправляє одноразову подію.
+`StateFlow` тримає стан екрана, `SharedFlow` відправляє одноразову подію.
 
-8. **stateIn і shareIn**
+7. **stateIn і shareIn**
 
-Звичайний `Flow` можна перетворити на `StateFlow`:
-
-```kotlin
-val state: StateFlow<UiState> =
-    repository.observeUser()
-        .map { UiState.Success(it) }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = UiState.Loading
-        )
-```
-
-Або на `SharedFlow`:
+Звичайний `Flow` можна перетворити на `StateFlow` або `SharedFlow`:
 
 ```kotlin
-val shared: SharedFlow<Data> =
-    repository.observeData()
-        .shareIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(),
-            replay = 0
-        )
+val state = repository.observeUser()
+    .map { UiState.Success(it) }
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState.Loading)
 ```
 
-`stateIn` використовують, коли потрібен state. `shareIn` — коли потрібно
-поширити один upstream flow між кількома collectors.
+```kotlin
+val shared = repository.observeData()
+    .shareIn(viewModelScope, SharingStarted.WhileSubscribed(), replay = 0)
+```
 
-9. **Коли що використовувати**
+`stateIn` — коли потрібен state. `shareIn` — коли треба поширити один upstream між кількома collectors.
 
-- `Flow` — для cold pipeline, domain streams, repository APIs.
-- `StateFlow` — для UI-state і будь-якого "поточного значення".
-- `SharedFlow` — для events, broadcast і one-time signals.
+8. **Практичне правило**
 
-Поганий сигнал — використовувати `StateFlow` для navigation event. Якщо
-користувач повернеться на екран або UI пересабскрайбиться, старий navigation
-state може повторитись. Для таких речей краще `SharedFlow`.
+- `Flow` — cold pipeline або repository/domain stream.
+- `StateFlow` — поточний UI-state.
+- `SharedFlow` — one-time events або broadcast.
+- Не використовувати `StateFlow` для navigation/snackbar events, щоб не повторити стару подію після resubscribe.
 
-10. **Практичне правило**
-
-Якщо питаєш "який зараз стан?" — це `StateFlow`.
-Якщо питаєш "які значення приходять у pipeline?" — це `Flow`.
-Якщо питаєш "яку подію треба розіслати subscribers?" — це `SharedFlow`.
-
-**Коротко:** `Flow` — cold stream для асинхронних значень, `StateFlow` — hot stream
-із поточним станом, `SharedFlow` — hot stream для подій і broadcast-сценаріїв.
+**Коротко:** `Flow` — cold stream для асинхронних значень, `StateFlow` — hot stream із поточним станом, `SharedFlow` — hot stream для подій і broadcast-сценаріїв.
 
 </details>
 <details>
@@ -21225,7 +21145,7 @@ fun UserItem(user: User, selectedIds: Set<String>) {
 
 #### Kotlin
 
-DFS або Depth-First Search — це алгоритм обходу графа або дерева, який іде “вглиб” по одному шляху настільки далеко, наскільки можливо, а потім повертається назад і пробує інші гілки. Його використовують для обходу дерев, графів, пошуку шляхів, cycle detection, topological sort, connected components.
+`DFS` або `Depth-First Search` — це алгоритм обходу дерева або графа, який іде “вглиб” по одному шляху настільки далеко, наскільки можливо, а потім повертається назад і пробує інші гілки.
 
 1. **Ідея DFS**
 
@@ -21233,10 +21153,8 @@ DFS або Depth-First Search — це алгоритм обходу графа 
 
 ```text
         A
-      /   \
-     B     C
-    / \     \
-   D   E     F
+      /        B     C
+    / \        D   E     F
 ```
 
 DFS може пройти так:
@@ -21245,7 +21163,7 @@ DFS може пройти так:
 A -> B -> D -> E -> C -> F
 ```
 
-Алгоритм спочатку йде вглиб до кінця гілки, потім повертається.
+Алгоритм спочатку заглиблюється до кінця гілки, потім повертається.
 
 2. **DFS через рекурсію**
 
@@ -21264,13 +21182,7 @@ fun dfs(node: TreeNode) {
 }
 ```
 
-Виклик:
-
-```kotlin
-dfs(root)
-```
-
-Це простий recursive DFS для дерева.
+Для дерева цього зазвичай достатньо, бо там немає циклів.
 
 3. **DFS для графа**
 
@@ -21293,9 +21205,9 @@ fun dfs(
 }
 ```
 
-Без `visited` можна потрапити в нескінченну рекурсію.
+Без `visited` DFS може зациклитися.
 
-4. **DFS iterative через stack**
+4. **Ітеративний DFS через stack**
 
 Рекурсію можна замінити stack-ом:
 
@@ -21343,141 +21255,47 @@ Time:  O(V + E)
 Space: O(V)
 ```
 
-`Space O(V)` потрібен для `visited` і stack/recursion call stack.
+Памʼять потрібна для `visited` і recursion stack або явного stack.
 
 6. **DFS vs BFS**
 
 DFS:
 
 - іде вглиб;
-- використовує stack або recursion;
-- добре підходить для topological sort, cycle detection;
-- може швидко знайти глибокий target;
-- не гарантує найкоротший шлях у unweighted graph.
+- використовує recursion або stack;
+- добре підходить для cycle detection, topological sort, connected components;
+- не гарантує shortest path у unweighted graph.
 
 BFS:
 
 - іде рівнями;
 - використовує queue;
 - знаходить найкоротший шлях у unweighted graph;
-- часто потребує більше памʼяті для широких графів.
+- може потребувати більше памʼяті для широких графів.
 
-7. **Cycle detection**
+7. **Де використовується**
 
-DFS часто використовують для пошуку циклів:
+DFS часто застосовують для:
 
-```kotlin
-fun hasCycle(
-    graph: Map<String, List<String>>
-): Boolean {
-    val visited = mutableSetOf<String>()
-    val recursionStack = mutableSetOf<String>()
+- обходу дерев;
+- пошуку циклів у графі;
+- connected components;
+- topological sort;
+- file tree traversal;
+- navigation/dependency graph validation;
+- flatten comments/replies tree.
 
-    fun visit(node: String): Boolean {
-        if (node in recursionStack) return true
-        if (node in visited) return false
+8. **Ризик StackOverflow**
 
-        visited.add(node)
-        recursionStack.add(node)
-
-        for (neighbor in graph[node].orEmpty()) {
-            if (visit(neighbor)) return true
-        }
-
-        recursionStack.remove(node)
-        return false
-    }
-
-    return graph.keys.any { visit(it) }
-}
-```
-
-Це корисно для dependency graph-ів, build modules, navigation graphs.
-
-8. **DFS для connected components**
-
-```kotlin
-fun connectedComponents(
-    graph: Map<String, List<String>>
-): List<Set<String>> {
-    val visited = mutableSetOf<String>()
-    val components = mutableListOf<Set<String>>()
-
-    fun visit(node: String, component: MutableSet<String>) {
-        if (!visited.add(node)) return
-
-        component.add(node)
-
-        for (neighbor in graph[node].orEmpty()) {
-            visit(neighbor, component)
-        }
-    }
-
-    for (node in graph.keys) {
-        if (node !in visited) {
-            val component = mutableSetOf<String>()
-            visit(node, component)
-            components.add(component)
-        }
-    }
-
-    return components
-}
-```
-
-9. **Ризик StackOverflow**
-
-Recursive DFS може впасти зі `StackOverflowError`, якщо граф/дерево дуже глибоке:
+Recursive DFS може впасти зі `StackOverflowError`, якщо структура дуже глибока:
 
 ```text
 A -> B -> C -> D -> ... -> 100000 nodes
 ```
 
-Для дуже глибоких структур краще iterative DFS через `ArrayDeque`.
+Для таких випадків краще використовувати iterative DFS через `ArrayDeque`.
 
-10. **Android-приклади**
-
-DFS може знадобитися для:
-
-- обходу tree-like UI/data structures;
-- dependency graph analysis;
-- navigation graph validation;
-- file tree traversal;
-- comments/replies tree;
-- category tree;
-- build/module graph tools.
-
-Наприклад, обхід коментарів:
-
-```kotlin
-data class Comment(
-    val id: String,
-    val replies: List<Comment>
-)
-
-fun flattenComments(root: Comment): List<Comment> {
-    val result = mutableListOf<Comment>()
-
-    fun visit(comment: Comment) {
-        result.add(comment)
-        comment.replies.forEach(::visit)
-    }
-
-    visit(root)
-    return result
-}
-```
-
-11. **Практичне правило**
-
-- DFS іде вглиб, BFS — рівнями.
-- Для дерева можна recursive DFS без `visited`.
-- Для графа майже завжди потрібен `visited`.
-- Для дуже глибоких структур краще iterative DFS.
-- DFS не гарантує shortest path у unweighted graph.
-- Складність DFS — `O(V + E)`.
-
-**Коротко:** DFS — це алгоритм обходу графа або дерева вглиб через recursion або stack. Він простий, ефективний і дуже корисний для задач із графами, деревами, залежностями, циклами й connected components.
+**Коротко:** DFS — це обхід графа або дерева вглиб через recursion або stack. Для дерева часто достатньо рекурсії, для графа потрібен `visited`, а складність алгоритму — `O(V + E)`.
 
 </details>
 <details>
@@ -30890,13 +30708,13 @@ LaunchedEffect(listState) {
 
 #### Kotlin
 
-Оптимізація recomposition у Compose — це не спроба “вимкнути” recomposition, а зробити її локальною, дешевою і передбачуваною. Нормальна модель: state змінюється → Compose перемальовує тільки залежні частини UI. Проблеми починаються, коли state лежить занадто високо, моделі нестабільні або в composable виконується важка робота.
+Оптимізація recomposition у Compose — це не спроба “вимкнути” recomposition, а зробити її локальною, дешевою і передбачуваною. Проблема не в самому recomposition, а в широкому state scope, нестабільних моделях або важкій роботі в composable body.
 
 1. **Тримати state на правильному рівні**
 
 State треба hoist-ити тільки настільки високо, наскільки потрібно.
 
-Погано, коли зміна тексту в search field змушує recompose-ити великий екран:
+Погано, якщо зміна search text recompose-ить увесь екран:
 
 ```kotlin
 @Composable
@@ -30962,7 +30780,7 @@ data class UserUiModel(
 )
 ```
 
-Такі моделі простіше порівнювати, безпечніше передавати в composable і легше використовувати для skip recomposition.
+Immutable UI models безпечніше передавати в composable і простіше skip-ати при recomposition.
 
 4. **Не мутувати списки in-place**
 
@@ -30972,7 +30790,7 @@ data class UserUiModel(
 users.add(newUser)
 ```
 
-Краще створювати новий snapshot:
+Краще:
 
 ```kotlin
 state = state.copy(
@@ -30995,25 +30813,21 @@ LazyColumn {
 }
 ```
 
-`key` привʼязує remembered state і item identity до конкретного елемента, а не до позиції. Це критично при insert/delete/sort/filter.
+`key` привʼязує remembered state до item identity, а не до позиції. Це важливо при insert/delete/sort/filter.
 
-6. **Використовувати contentType для mixed lists**
+Для mixed lists корисний ще й `contentType`:
 
 ```kotlin
-LazyColumn {
-    items(
-        items = feedItems,
-        key = { it.id },
-        contentType = { it::class }
-    ) { item ->
-        FeedItem(item)
-    }
+items(
+    items = feedItems,
+    key = { it.id },
+    contentType = { it::class }
+) { item ->
+    FeedItem(item)
 }
 ```
 
-`contentType` допомагає Compose ефективніше перевикористовувати item compositions одного типу.
-
-7. **Не робити важку роботу в composable body**
+6. **Не робити важку роботу в composable body**
 
 Погано:
 
@@ -31021,13 +30835,11 @@ LazyColumn {
 @Composable
 fun UserList(users: List<User>) {
     val sorted = users.sortedBy { it.name }
-    LazyColumn {
-        items(sorted) { UserItem(it) }
-    }
+    LazyColumn { items(sorted) { UserItem(it) } }
 }
 ```
 
-Краще підготувати дані у ViewModel або кешувати обчислення:
+Краще винести transformation у ViewModel або кешувати:
 
 ```kotlin
 val sorted = remember(users) {
@@ -31035,9 +30847,9 @@ val sorted = remember(users) {
 }
 ```
 
-Але якщо це business/UI transformation для всього екрана — краще винести у ViewModel/use case mapper.
+7. **remember і derivedStateOf**
 
-8. **remember для дорогих обʼєктів**
+`remember` підходить для дорогих обʼєктів або обчислень:
 
 ```kotlin
 val formatter = remember {
@@ -31045,15 +30857,7 @@ val formatter = remember {
 }
 ```
 
-Якщо значення залежить від параметрів, додати keys:
-
-```kotlin
-val filteredUsers = remember(users, query) {
-    users.filter { it.name.contains(query, ignoreCase = true) }
-}
-```
-
-9. **derivedStateOf для часто змінного state**
+`derivedStateOf` корисний, коли source state змінюється часто, а derived result — рідко:
 
 ```kotlin
 val listState = rememberLazyListState()
@@ -31065,39 +30869,9 @@ val showScrollTop by remember {
 }
 ```
 
-Scroll state змінюється часто, але button visibility змінюється рідко. `derivedStateOf` зменшує зайві invalidations.
+8. **Профілювати, а не гадати**
 
-10. **Lifecycle-aware collection**
-
-```kotlin
-val state by viewModel.state.collectAsStateWithLifecycle()
-```
-
-Це краще для Android, ніж collect без lifecycle, бо UI не буде оновлюватися, коли screen неактивний.
-
-11. **Не створювати state без remember**
-
-Погано:
-
-```kotlin
-@Composable
-fun Counter() {
-    val count = mutableStateOf(0)
-}
-```
-
-Правильно:
-
-```kotlin
-@Composable
-fun Counter() {
-    var count by remember { mutableStateOf(0) }
-}
-```
-
-12. **Профілювати, а не гадати**
-
-Для реальної оптимізації дивитися:
+Для реальної оптимізації дивляться:
 
 - Layout Inspector recomposition counters;
 - Compose compiler reports;
@@ -31106,21 +30880,9 @@ fun Counter() {
 - Macrobenchmark;
 - baseline profiles.
 
-Високий recomposition count не завжди проблема, якщо composable дешевий. Проблема — дорога робота на main thread, зайвий layout/draw або нестабільні параметри.
+Високий recomposition count не завжди проблема, якщо composable дешевий.
 
-13. **Практичне правило**
-
-- State тримати на найнижчому достатньому рівні.
-- UI розбивати на маленькі composable.
-- Передавати immutable/stable UI models.
-- Не мутувати списки in-place.
-- У lazy lists використовувати `key`, а для mixed lists ще й `contentType`.
-- Heavy calculations робити у ViewModel або кешувати через `remember`.
-- Scroll-derived state обгортати в `derivedStateOf`.
-- Side effects запускати тільки через effect APIs.
-- Спочатку міряти, потім оптимізувати.
-
-**Коротко:** recomposition оптимізують через правильну модель state, immutable параметри, локалізацію state, stable keys у lazy lists, кешування дорогих обчислень і профілювання. Recomposition сама по собі нормальна; проблема — дорога або занадто широка recomposition.
+**Коротко:** recomposition оптимізують через локальний state, маленькі composable, immutable UI models, stable `key` у lazy lists, кешування важких обчислень і профілювання. Recomposition нормальна; проблема — коли вона широка або дорога.
 
 </details>
 <details>
