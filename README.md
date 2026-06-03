@@ -15777,7 +15777,7 @@ data class FeedUiState(
 
 #### Kotlin
 
-`key` у `LazyColumn` потрібен, щоб Compose міг стабільно ідентифікувати item незалежно від його позиції в списку. Без key Compose переважно орієнтується на index. Якщо item-и додаються, видаляються або міняються місцями, index-based identity може призвести до зайвих recompositions, втрати локального state або “переїзду” state між item-ами.
+`key` у `LazyColumn` потрібен, щоб Compose міг стабільно ідентифікувати item незалежно від його позиції. Без key Compose переважно орієнтується на index, що може ламати local state при insert/delete/reorder.
 
 1. **Базовий приклад**
 
@@ -15808,7 +15808,7 @@ LazyColumn {
 
 2. **Проблема без key**
 
-Припустимо, список:
+Було:
 
 ```text
 index 0 -> Alice
@@ -15816,7 +15816,7 @@ index 1 -> Bob
 index 2 -> Charlie
 ```
 
-Якщо вставити нового item на початок:
+Вставили item на початок:
 
 ```text
 index 0 -> Kate
@@ -15825,22 +15825,11 @@ index 2 -> Bob
 index 3 -> Charlie
 ```
 
-Без key Compose може сприймати це як “на index 0 був Alice, тепер Kate”, “на index 1 був Bob, тепер Alice”. Тобто identity привʼязана до позиції, а не до item-а.
-
-З key:
-
-```text
-id alice -> Alice
-id bob -> Bob
-id charlie -> Charlie
-id kate -> Kate
-```
-
-Compose розуміє, що Alice просто змістилася, а не стала новим item-ом.
+Без key Compose може сприймати це як зміну item-ів на позиціях. З key Compose розуміє, що `Alice`, `Bob` і `Charlie` просто змістилися.
 
 3. **Локальний state item-а**
 
-Проблема особливо помітна, якщо item має локальний state:
+Проблема особливо помітна, якщо item має local state:
 
 ```kotlin
 @Composable
@@ -15858,24 +15847,11 @@ fun UserItem(user: User) {
 }
 ```
 
-Без key при insert/delete `expanded` може “переїхати” до іншого item-а, бо Compose асоціював state з позицією.
+Без key після insert/delete `expanded` може “переїхати” до іншого item-а, бо state був привʼязаний до позиції.
 
-З key:
+4. **Що key означає під капотом**
 
-```kotlin
-items(
-    items = users,
-    key = { it.id }
-) { user ->
-    UserItem(user)
-}
-```
-
-state привʼязується до identity item-а.
-
-4. **Що key собою являє під капотом**
-
-На концептуальному рівні key — це identity token для item-а в composition.
+Концептуально key — це identity token для item-а в composition.
 
 Compose використовує key, щоб:
 
@@ -15885,7 +15861,7 @@ Compose використовує key, щоб:
 - оптимізувати reuse composition;
 - підтримати item animations.
 
-Це не database key сам по собі, а stable identity для Compose runtime.
+Це не обовʼязково database key, але він має стабільно представляти identity item-а.
 
 5. **Key має бути stable**
 
@@ -15901,15 +15877,13 @@ key = { it.id }
 key = { UUID.randomUUID().toString() }
 ```
 
-Такий key змінюється на кожну recomposition. Compose вважатиме item новим щоразу.
-
-Також погано:
+Або:
 
 ```kotlin
 key = { System.currentTimeMillis() }
 ```
 
-Key має бути однаковим для того самого item-а між recompositions.
+Такий key змінюється на кожну recomposition, тому Compose вважатиме item новим щоразу.
 
 6. **Key має бути unique**
 
@@ -15933,8 +15907,6 @@ key = { it.id }
 key = { item -> "${item.type}:${item.localId}" }
 ```
 
-Але краще мати нормальний stable id у model.
-
 7. **Не використовувати index як key**
 
 Погано:
@@ -15948,13 +15920,11 @@ itemsIndexed(
 }
 ```
 
-Index змінюється при insert/delete/reorder, тому це майже те саме, що не мати key.
+Index змінюється при insert/delete/reorder, тому це майже те саме, що не мати key. Index прийнятний тільки для повністю статичних списків.
 
-Index може бути прийнятним тільки для повністю статичних списків, де порядок і склад не змінюються. Але в реальних списках краще не використовувати index.
+8. **Key і animations/Paging**
 
-8. **Key і animations**
-
-Для item placement animations key критично важливий:
+Для item animations key критично важливий:
 
 ```kotlin
 LazyColumn {
@@ -15970,52 +15940,27 @@ LazyColumn {
 }
 ```
 
-Якщо Compose не знає identity item-а, він не може коректно анімувати переміщення.
-
-9. **Key і Paging**
-
-У Paging Compose теж треба задавати key:
+У Paging Compose також задають key:
 
 ```kotlin
-val users = viewModel.users.collectAsLazyPagingItems()
-
-LazyColumn {
-    items(
-        count = users.itemCount,
-        key = users.itemKey { it.id }
-    ) { index ->
-        val user = users[index]
-        if (user != null) {
-            UserItem(user)
-        }
-    }
+items(
+    count = users.itemCount,
+    key = users.itemKey { it.id }
+) { index ->
+    users[index]?.let { UserItem(it) }
 }
 ```
 
-Це допомагає стабільності item state при підвантаженні сторінок.
+9. **Практичне правило**
 
-10. **Коли key не критичний**
-
-Key менш критичний, якщо:
-
-- список маленький;
-- список статичний;
-- item-и не мають локального state;
-- немає reorder/insert/delete;
-- немає animations.
-
-Але як практика для production списків — key краще задавати майже завжди.
-
-11. **Практичне правило**
-
-- Для `LazyColumn` item-ів використовувати stable unique key.
+- Для `LazyColumn` використовувати stable unique key.
 - Найкращий key — server/database id.
 - Не використовувати random, time або index як key.
 - Якщо item має local state — key обовʼязковий.
 - Для reorder/insert/delete/animation — key обовʼязковий.
 - Key має представляти identity, а не position.
 
-**Коротко:** `key` у `LazyColumn` — це стабільна identity item-а для Compose runtime. Він потрібен, щоб правильно зберігати state, зіставляти item-и між оновленнями списку, уникати зайвої роботи й коректно обробляти reorder, insert, delete та animations.
+**Коротко:** `key` у `LazyColumn` — це стабільна identity item-а для Compose runtime. Він потрібен, щоб правильно зберігати state, зіставляти item-и між оновленнями списку й коректно обробляти reorder, insert, delete та animations.
 
 </details>
 <details>
