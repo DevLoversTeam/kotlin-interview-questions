@@ -12441,34 +12441,25 @@ withTimeout(30_000) {
 
 #### Kotlin
 
-Станом на червень 2026 року варто орієнтуватися на Kotlin 2.x лінійку: K2
-compiler уже є базою сучасного Kotlin, Kotlin Multiplatform активно розвивається,
-а релізи 2.3 і 2.4 принесли важливі зміни в language features, JVM, Native,
-Wasm, Gradle tooling, standard library і Compose compiler.
+У 2026 році сильний Kotlin-розробник має орієнтуватися в Kotlin 2.x, K2 compiler, розвитку Multiplatform, нових language features, tooling і Compose compiler. Не обовʼязково використовувати кожну нову фічу в production, але треба розуміти, що вже стало базою екосистеми і які ризики є при міграції.
 
 1. **Kotlin 2.x і K2 compiler**
 
-Найважливіший фундамент останніх років — K2 compiler. Для розробника це означає:
+K2 — це нова compiler architecture, яка стала фундаментом сучасного Kotlin.
 
-- кращу основу для майбутніх language features;
-- швидшу і точнішу compiler analysis;
-- кращу інтеграцію IDE/compiler;
-- стабільніший розвиток Kotlin Multiplatform;
-- поступове прибирання старих language-version режимів.
+Практично це означає:
 
-Практично: якщо проєкт досі живе на старій Kotlin 1.x лінійці, у 2026 році
-треба планувати міграцію на Kotlin 2.x, бо нові можливості, tooling і ecosystem
-будуть концентруватися там.
+- кращу compiler analysis;
+- швидший розвиток language features;
+- сильнішу основу для IDE/tooling;
+- стабільнішу Multiplatform-історію;
+- поступовий відхід від Kotlin 1.x як baseline.
+
+Для Android-команди це питання не тільки синтаксису, а й AGP, Gradle, Compose compiler, kapt/ksp і library compatibility.
 
 2. **Context parameters**
 
-Context parameters — одна з найважливіших language features для DSL, dependency
-passing і declarative APIs.
-
-Ідея: функція може вимагати контекст, який доступний не як явний параметр
-кожного виклику, а як contextual dependency.
-
-Концептуально:
+Context parameters дозволяють функції вимагати контекст, який доступний у scope:
 
 ```kotlin
 context(logger: Logger)
@@ -12477,17 +12468,7 @@ fun User.save() {
 }
 ```
 
-Це корисно для:
-
-- DSL;
-- dependency scopes;
-- logging/transaction context;
-- typed contextual APIs;
-- зменшення boilerplate у ланцюжках викликів.
-
-Тут важливо не перетворити context parameters на прихований service locator.
-Якщо dependency є критичною бізнес-залежністю класу, constructor injection усе
-ще часто буде зрозумілішим.
+Це корисно для DSL, scoped APIs, logging, transactions, typed context. Але на співбесіді важливо сказати: це не заміна DI і не привід робити прихований service locator.
 
 3. **Explicit backing fields**
 
@@ -12498,20 +12479,16 @@ var name: String = ""
     field = value.trim()
 ```
 
-Це робить роботу з backing field більш явною і гнучкою, особливо для property
-API, де треба контролювати читання/запис без зайвого private property.
-
-Практична цінність:
+Практична користь:
 
 - менше boilerplate;
-- чистіші properties;
-- краще вираження invariants;
-- зручніше писати API з custom getter/setter.
+- чистіші custom getter/setter;
+- явніше вираження invariants;
+- зручніше проектувати property API.
 
-4. **Data-flow-based exhaustiveness for when**
+4. **Покращення exhaustiveness і sealed state**
 
-Kotlin продовжує покращувати аналіз `when`. Data-flow-based exhaustiveness
-дозволяє compiler-у краще розуміти, які cases уже покриті.
+Kotlin продовжує покращувати аналіз `when`, особливо для sealed hierarchies.
 
 ```kotlin
 sealed interface UiState {
@@ -12529,13 +12506,11 @@ fun render(state: UiState) {
 }
 ```
 
-Для Android/MVI/Compose це важливо, бо sealed state machines стають ще
-безпечнішими й краще перевіряються compiler-ом.
+Для Android, MVI і Compose це важливо, бо UI state machines стають безпечнішими.
 
-5. **Unused return value checker**
+5. **Unused return value checks**
 
-У Kotlin 2.3 зʼявився механізм для виявлення невикористаних return values.
-Це корисно, коли функція повертає результат, який не можна безпечно ігнорувати.
+У нових Kotlin 2.x релізах розвивається напрям перевірок для результатів, які не можна безпечно ігнорувати.
 
 Проблема:
 
@@ -12543,9 +12518,9 @@ fun render(state: UiState) {
 repository.saveUser(user)
 ```
 
-Якщо `saveUser()` повертає `Result`, але caller його ігнорує, це може бути багом.
+Якщо `saveUser()` повертає `Result`, але caller його ігнорує, це потенційний bug.
 
-Практична ідея:
+Краще:
 
 ```kotlin
 val result = repository.saveUser(user)
@@ -12555,137 +12530,91 @@ if (result.isFailure) {
 }
 ```
 
-Цей напрямок важливий для більш безпечного API-дизайну: результат операції має
-бути або явно використаний, або явно проігнорований.
+Це важливо для API-дизайну: результат операції має бути або використаний, або явно проігнорований.
 
-6. **Java 25 target на JVM**
+6. **Kotlin Multiplatform і Swift export**
 
-Kotlin 2.3 додав підтримку генерації bytecode для Java 25.
-
-Для Android це не завжди прямо релевантно, бо Android має власні constraints.
-Але для backend/JVM Kotlin це важливо:
-
-- нові JVM capabilities;
-- актуальна сумісність із modern Java;
-- поступова еволюція JVM target-ів;
-- краще позиціонування Kotlin у backend.
-
-Практично: JVM-проєкти мають синхронно керувати Kotlin version, Java toolchain,
-Gradle і runtime deployment target.
-
-7. **Kotlin Multiplatform і Swift export**
-
-У 2026 році KMP стає дедалі практичнішим, особливо для mobile. Важливий напрям —
-Swift export і покращення Kotlin/Native interop.
-
-Ціль проста: зробити shared Kotlin API природнішим для Swift.
-
-Це важливо для KMM, бо iOS-команда не повинна відчувати, що працює з чужорідним
-Kotlin API. Хороший shared module має мати Swift-friendly boundary:
-
-```kotlin
-class UserSdk(
-    private val loadUser: LoadUserUseCase
-) {
-    suspend fun loadUser(id: String): User {
-        return loadUser.invoke(id)
-    }
-}
-```
-
-Але складні `Flow`, sealed hierarchies і generics усе ще треба проектувати
-обережно для Swift interop.
-
-8. **Kotlin/Wasm**
-
-Kotlin/Wasm помітно просунувся: web target став практичнішим, покращується JS
-interop, exception handling, debugging і integration із web tooling.
-
-Це важливо знати, навіть якщо ти Android-розробник, бо Kotlin ecosystem рухається
-до ширшої multiplatform story:
+KMP у 2026 році важливо знати хоча б концептуально:
 
 ```text
 common Kotlin logic
-    -> Android
-    -> iOS
-    -> JVM backend
-    -> Web/Wasm
+ -> Android
+ -> iOS
+ -> JVM backend
+ -> Web/Wasm
 ```
 
-На співбесіді достатньо розуміти: Wasm — це не заміна Android, а ще один target
-для shared Kotlin logic і потенційно UI/runtime сценаріїв.
+Для mobile особливо важливі Swift export і Kotlin/Native interop. Shared Kotlin API має бути зручним для iOS-команди, тому треба обережно проектувати boundaries: `Flow`, sealed types, generics і exceptions не завжди природно виглядають у Swift.
 
-9. **Standard library: UUID, time, Base64/Hex**
+7. **Kotlin/Wasm**
 
-У Kotlin 2.x стабілізуються корисні standard library API:
+Kotlin/Wasm — це ще один target для Kotlin, не заміна Android. Для Android-розробника достатньо розуміти, що Kotlin рухається до ширшої multiplatform-екосистеми, де частину logic можна шарити між mobile, backend і web/runtime сценаріями.
 
-- UUID у common stdlib;
-- time tracking;
-- Base64;
-- HexFormat;
-- покращення для multiplatform utility-коду.
+8. **Standard library improvements**
 
-Практична користь: менше platform-specific helper-ів і менше сторонніх
-залежностей для базових речей.
+У Kotlin 2.x розвиваються common stdlib API, корисні для Multiplatform:
 
-Наприклад, у shared KMP-коді UUID/time API у standard library зменшують потребу
-власних wrappers.
+- UUID;
+- time-related APIs;
+- Base64/Hex utilities;
+- collection/helper improvements.
 
-10. **Gradle і build tooling**
+Практична цінність: менше platform-specific wrappers і сторонніх залежностей для базових задач у shared code.
 
-Kotlin 2.x також приносить Gradle-related покращення:
+9. **Gradle і build tooling**
 
-- compatibility з новими Gradle версіями;
-- кращі APIs для generated sources;
-- binary compatibility validation у Kotlin Gradle plugin;
-- покращення KMP dependency declarations;
-- швидші Native release tasks.
+Для техліда tooling не менш важливий за language features:
 
-Для техліда це важливо не менше за language syntax. Поганий build setup може
-зʼїсти більше часу команди, ніж відсутність нової мовної фічі.
+- Kotlin Gradle Plugin compatibility;
+- Gradle/AGP versions;
+- KSP/kapt migration risks;
+- generated sources;
+- version catalogs;
+- binary compatibility checks;
+- KMP dependency setup.
 
-11. **Compose compiler і diagnostics**
+Погано налаштований build може коштувати команді більше, ніж відсутність нової мовної фічі.
 
-Compose compiler у Kotlin 2.x став частиною Kotlin ecosystem, а не окремою
-напіввідокремленою історією.
+10. **Compose compiler і diagnostics**
 
-Важливий напрям — кращі stack traces і diagnostics для minified Android apps.
-Для production Compose-додатків це практично корисно: легше розуміти crashes,
-які сталися під час composition, measure або draw.
+Compose compiler у Kotlin 2.x став тісніше інтегрований з Kotlin tooling. Для Android це важливо через:
 
-12. **Що реально треба знати Android/Kotlin розробнику**
+- сумісність Kotlin/Compose/AGP;
+- recomposition diagnostics;
+- stack traces;
+- minified app debugging;
+- compiler metrics.
 
-У 2026 році я б очікував від сильного Kotlin-розробника розуміння:
+Якщо команда пише Compose, оновлення Kotlin треба перевіряти разом із Compose compiler і Android Studio.
+
+11. **Що очікувати на співбесіді**
+
+Я б очікував, що Kotlin-розробник у 2026 році знає:
 
 - Kotlin 2.x/K2 як baseline;
-- context parameters і де вони доречні;
+- context parameters і їх ризики;
 - explicit backing fields;
 - sealed state + exhaustive `when`;
-- KMP/KMM і Swift interop;
-- Kotlin/Wasm на концептуальному рівні;
-- stdlib improvements для UUID/time/Base64;
-- Gradle/version catalog/toolchain discipline;
-- Compose compiler changes, якщо розробник працює з Compose;
-- migration risks при оновленні Kotlin.
+- KMP/KMM і Swift interop на концептуальному рівні;
+- Kotlin/Wasm як частину ecosystem;
+- stdlib improvements для shared code;
+- Gradle/AGP/KSP/Compose compatibility;
+- що нові фічі треба оцінювати перед production adoption.
 
-13. **Практичне правило**
+12. **Практичне правило**
 
-Не треба тягнути кожну нову фічу в production одразу. Нові можливості треба
-оцінювати через:
+Нову Kotlin-фічу не треба тягнути в production автоматично. Оцінювати треба:
 
 - stability level;
 - IDE support;
-- Gradle/AGP compatibility;
-- Android Studio support;
-- team readiness;
+- Android Studio/AGP compatibility;
+- Gradle impact;
 - library ecosystem;
+- team readiness;
 - migration cost;
-- production value.
+- реальну користь для коду.
 
-**Коротко:** у 2026 році Kotlin — це вже не тільки "зручніший Java для Android".
-Це Kotlin 2.x з K2 compiler, активним Multiplatform, покращеним Swift/Wasm
-напрямом, сильнішим tooling і новими language features для безпечнішого та
-виразнішого API-дизайну.
+**Коротко:** у 2026 році варто знати Kotlin 2.x, K2 compiler, context parameters, explicit backing fields, розвиток KMP/Swift export, Wasm-напрям, stdlib/tooling покращення і Compose compiler compatibility. Але техлід має оцінювати ці фічі прагматично, а не впроваджувати все одразу.
 
 </details>
 <details>
@@ -17421,332 +17350,136 @@ MVI варто використовувати там, де складність 
 
 #### Kotlin
 
-Масштабований Android-додаток — це не просто “багато модулів”. Це кодова база, у якій можна додавати фічі без постійного ламання існуючих екранів, без росту build time до неприйнятного рівня і без хаосу в залежностях. Головна ціль — керована складність.
+Масштабований Android-додаток — це не “багато модулів”, а система, де зміни в одній частині мінімально ламають інші. Головні принципи: зрозумілі boundaries, стабільні contracts, однонаправлений data flow, тестованість і контроль залежностей.
 
-1. **Розділяти відповідальності по шарах**
+1. **Архітектурні шари**
 
-Базова структура:
+Типова структура:
 
 ```text
-presentation -> domain -> data
+UI -> ViewModel -> UseCase -> Repository -> DataSource
 ```
 
-- `presentation` — UI, ViewModel, UI state, navigation events;
-- `domain` — use cases, business rules, domain models;
-- `data` — repositories implementation, API, database, mappers.
+- `UI` показує state і відправляє events.
+- `ViewModel` керує screen state.
+- `UseCase` містить бізнес-операцію.
+- `Repository` приховує джерела даних.
+- `DataSource` працює з API, DB, cache.
 
-UI не має знати про Retrofit DTO або Room entities.
+UI не має знати про Retrofit, Room або конкретну storage-логіку.
 
-Погано:
+2. **Feature-first modularization**
 
-```kotlin
-class UserViewModel(
-    private val api: UserApi
-) : ViewModel()
-```
-
-Краще:
-
-```kotlin
-class UserViewModel(
-    private val getUserProfile: GetUserProfileUseCase
-) : ViewModel()
-```
-
-2. **Використовувати feature-based modularization**
-
-Для великого проєкту краще групувати код навколо фіч, а не тільки навколо технічних шарів:
+Для великого проєкту краще групувати код навколо features:
 
 ```text
 :app
 :core:network
 :core:database
-:core:designsystem
+:core:ui
 :core:common
-:feature:auth
 :feature:profile
-:feature:payments
-:feature:settings
+:feature:checkout
+:feature:search
 ```
 
-Фіча має приховувати свою внутрішню реалізацію і відкривати тільки мінімальний API.
+Feature-модуль має бути максимально самодостатнім. Core-модулі містять спільну інфраструктуру, але не повинні знати про конкретні features.
 
-3. **Контролювати dependency graph**
+3. **Контроль залежностей**
 
-Залежності мають іти в одному напрямку.
+Правильний напрямок залежностей:
 
 ```text
-app -> feature -> core
+feature -> domain contracts -> data implementation
 ```
 
-Погано:
+Не можна, щоб `core` залежав від `feature`, або щоб одна feature напряму тягнула іншу без contract/API модуля. Інакше код швидко перетвориться на циклічний граф.
 
-```text
-core -> feature
-feature:profile -> feature:payments implementation
-```
+4. **Stable contracts**
 
-Краще використовувати contracts:
+Між шарами краще мати інтерфейси або чіткі моделі:
 
 ```kotlin
-interface PaymentsNavigator {
-    fun openPaymentDetails(paymentId: String)
+interface UserRepository {
+    suspend fun getUser(id: UserId): User
 }
 ```
 
-Фіча залежить від abstraction, а binding робиться на app-level.
+Це спрощує тестування, заміну implementation і роботу кількох команд паралельно.
 
-4. **Domain layer має бути незалежним**
+5. **State management**
 
-Use case не має знати про Android framework:
-
-```kotlin
-class GetUserProfileUseCase(
-    private val repository: UserRepository
-) {
-    suspend operator fun invoke(userId: UserId): UserProfile {
-        return repository.getUserProfile(userId)
-    }
-}
-```
-
-Погано, якщо domain приймає `Context`, `Resources`, `Activity` або Android `Bundle`.
-
-5. **Розділяти API models, DB entities і domain models**
-
-Не варто використовувати одну модель всюди.
+Екран має мати один зрозумілий state:
 
 ```kotlin
-data class UserDto(
-    val id: String,
-    val full_name: String
-)
-
-@Entity(tableName = "users")
-data class UserEntity(
-    @PrimaryKey val id: String,
-    val fullName: String
-)
-
-data class User(
-    val id: UserId,
-    val fullName: String
-)
-```
-
-Mapper:
-
-```kotlin
-fun UserDto.toEntity(): UserEntity {
-    return UserEntity(
-        id = id,
-        fullName = full_name
-    )
-}
-
-fun UserEntity.toDomain(): User {
-    return User(
-        id = UserId(id),
-        fullName = fullName
-    )
-}
-```
-
-Це захищає app від змін backend contract або database schema.
-
-6. **Писати UI як pure rendering state**
-
-ViewModel готує state:
-
-```kotlin
-data class ProfileUiState(
+data class ProfileState(
     val isLoading: Boolean = false,
-    val userName: String = "",
-    val errorMessage: String? = null
+    val user: UserUi? = null,
+    val error: String? = null
 )
 ```
 
-UI рендерить:
+ViewModel змінює state, UI тільки рендерить. Для Compose це особливо важливо, бо хаотичний state швидко створює зайві recompositions і складні баги.
 
-```kotlin
-@Composable
-fun ProfileScreen(
-    state: ProfileUiState,
-    onRetryClick: () -> Unit
-) {
-    when {
-        state.isLoading -> CircularProgressIndicator()
-        state.errorMessage != null -> ErrorContent(onRetryClick)
-        else -> Text(state.userName)
-    }
-}
-```
+6. **Error handling**
 
-Так screen легше тестувати й переносити.
-
-7. **Dependency Injection**
-
-DI має збирати graph і контролювати lifetimes:
-
-```kotlin
-@Module
-@InstallIn(SingletonComponent::class)
-object NetworkModule {
-
-    @Provides
-    @Singleton
-    fun provideRetrofit(okHttpClient: OkHttpClient): Retrofit {
-        return Retrofit.Builder()
-            .baseUrl("https://api.example.com/")
-            .client(okHttpClient)
-            .build()
-    }
-}
-```
-
-Правило: класи мають явно отримувати залежності через constructor, а не створювати їх всередині.
-
-Погано:
-
-```kotlin
-class Repository {
-    private val api = Retrofit.Builder().build().create(UserApi::class.java)
-}
-```
-
-8. **Стандартизувати error handling**
-
-У великому додатку хаос із помилками швидко стає проблемою.
-
-Краще мати спільну модель:
+Помилки треба моделювати явно:
 
 ```kotlin
 sealed interface AppError {
     data object Network : AppError
     data object Unauthorized : AppError
-    data object NotFound : AppError
     data class Unknown(val cause: Throwable) : AppError
 }
+```
 
-sealed interface Result<out T> {
-    data class Success<T>(val value: T) : Result<T>
-    data class Failure(val error: AppError) : Result<Nothing>
+Не варто пробросувати сирий `Throwable` у UI. UI має отримувати зрозумілий стан або подію.
+
+7. **Dependency Injection**
+
+DI потрібен, щоб не створювати залежності вручну всередині класів:
+
+```kotlin
+class GetUserUseCase(
+    private val repository: UserRepository
+) {
+    suspend operator fun invoke(id: UserId): User = repository.getUser(id)
 }
 ```
 
-Repository мапить технічні помилки в domain-level errors.
+У production це зазвичай Hilt/Koin/manual DI. Важливіше не сам framework, а те, щоб залежності були явними.
 
-9. **Стандартизувати navigation**
+8. **Тестованість**
 
-Фічі не мають напряму знати внутрішні routes інших фіч.
+Код має тестуватись без Android framework там, де це можливо:
 
-Погано:
+- use cases — unit tests;
+- repositories — fake data sources;
+- ViewModel — state tests;
+- UI — screenshot або Compose UI tests;
+- integration — API/DB boundaries.
 
-```kotlin
-navController.navigate("payments/details/$id")
-```
+Якщо бізнес-логіку можна протестувати тільки через emulator, архітектура занадто привʼязана до Android layer.
 
-Краще:
+9. **Performance і build time**
 
-```kotlin
-interface PaymentsEntryPoint {
-    fun detailsRoute(paymentId: String): String
-}
-```
+Масштабованість включає не тільки runtime, а й швидкість розробки:
 
-Або app-level navigation coordinator, який знає, як звʼязати фічі.
+- не тягнути зайві залежності в feature;
+- не робити giant-модулі;
+- використовувати Gradle convention plugins;
+- слідкувати за incremental build;
+- уникати глобальних singleton-ів без потреби.
 
-10. **Тримати core модулі маленькими**
+10. **Практичне правило**
 
-`core:common` часто перетворюється на dump всього підряд. Це погано.
+Проєкт має масштабуватись по трьох осях:
 
-Краще мати вузькі модулі:
+- **код** — зрозумілі boundaries і модулі;
+- **команда** — features можна розробляти незалежно;
+- **зміни** — нова вимога не вимагає переписувати половину app.
 
-```text
-:core:network
-:core:database
-:core:datastore
-:core:analytics
-:core:logging
-:core:testing
-:core:ui
-```
-
-Кожен core module має мати чітку причину існування.
-
-11. **Оптимізувати build time**
-
-Для масштабованого проєкту build time — частина архітектури.
-
-Практики:
-
-- не створювати зайві міжмодульні залежності;
-- використовувати `api` тільки коли справді треба;
-- за замовчуванням використовувати `implementation`;
-- виносити стабільний код у core;
-- уникати циклічних залежностей;
-- розділяти heavy annotation processing;
-- використовувати convention plugins.
-
-Приклад:
-
-```kotlin
-dependencies {
-    implementation(project(":core:network"))
-    implementation(project(":core:database"))
-}
-```
-
-Не треба робити `api`, якщо типи не є частиною public contract модуля.
-
-12. **Тестованість як архітектурна вимога**
-
-Масштабований код має легко тестуватися.
-
-```kotlin
-class LoginViewModel(
-    private val login: LoginUseCase
-) : ViewModel()
-```
-
-У тесті можна підмінити use case:
-
-```kotlin
-val viewModel = LoginViewModel(
-    login = FakeLoginUseCase()
-)
-```
-
-Якщо ViewModel сама створює Retrofit, Room або system services — тестованість погана.
-
-13. **Версіонувати contracts між модулями**
-
-Якщо модуль відкриває API, він має бути стабільним:
-
-```kotlin
-interface ProfileFeatureApi {
-    fun profileRoute(userId: String): String
-}
-```
-
-Внутрішні implementation details не мають витікати назовні.
-
-14. **Практичне правило**
-
-Для масштабованого Android-додатку важливі:
-
-- чіткі boundaries між шарами;
-- feature modules;
-- однонаправлені dependencies;
-- domain без Android framework;
-- окремі DTO/entity/domain models;
-- constructor injection;
-- стандартизовані errors/navigation/logging;
-- контроль build time;
-- тестованість;
-- мінімальні public API між модулями.
-
-**Коротко:** масштабована Android-архітектура — це дисципліна в залежностях і boundaries. Якщо кожна фіча ізольована, core модулі вузькі, domain незалежний, а UI працює через state, додаток можна розвивати роками без неконтрольованого росту складності.
+**Коротко:** масштабований Android-додаток будується навколо чітких шарів, feature-first модулів, стабільних contracts, однонаправленого state flow, DI, тестованості і контрольованих залежностей. Мета — зробити зміни локальними, а не глобальними.
 
 </details>
 <details>
@@ -18337,11 +18070,11 @@ fun LoginScreen(
 
 #### Kotlin
 
-State hoisting у Compose — це винесення state з composable-компонента назовні, у його caller або ViewModel. Компонент перестає сам володіти станом і замість цього отримує `value` та callback для зміни. Це робить UI більш reusable, testable і predictable.
+`State hoisting` — це підняття state з composable у його parent. Дочірній composable не зберігає власний state, а отримує `value` і callback для зміни. Це робить компонент reusable, testable і контрольованим ззовні.
 
-1. **Базова ідея**
+1. **Ідея**
 
-Погано для reusable компонента:
+Замість цього:
 
 ```kotlin
 @Composable
@@ -18355,14 +18088,7 @@ fun SearchField() {
 }
 ```
 
-Проблема: `SearchField` сам контролює state. Parent не може:
-
-- прочитати `query`;
-- очистити поле;
-- синхронізувати query з ViewModel;
-- протестувати компонент як pure UI.
-
-Hoisted version:
+Краще так:
 
 ```kotlin
 @Composable
@@ -18377,62 +18103,43 @@ fun SearchField(
 }
 ```
 
-Тепер state контролює caller.
+Тепер `SearchField` не вирішує, де живе state. Він тільки показує value і повідомляє про intent змінити його.
 
-2. **Stateful і stateless composables**
-
-Stateful composable сам тримає state:
+2. **Parent керує state**
 
 ```kotlin
 @Composable
-fun StatefulCounter() {
-    var count by remember { mutableStateOf(0) }
+fun SearchScreen() {
+    var query by rememberSaveable { mutableStateOf("") }
 
-    Button(onClick = { count++ }) {
-        Text("Count: $count")
-    }
+    SearchField(
+        query = query,
+        onQueryChange = { query = it }
+    )
 }
 ```
 
-Stateless composable отримує state ззовні:
+Parent може зберігати state в `remember`, `rememberSaveable`, `ViewModel`, `StateFlow` або іншому state holder.
+
+3. **State у ViewModel**
+
+Для screen-level state краще використовувати ViewModel:
 
 ```kotlin
-@Composable
-fun Counter(
-    count: Int,
-    onIncrement: () -> Unit
-) {
-    Button(onClick = onIncrement) {
-        Text("Count: $count")
-    }
-}
-```
+data class SearchState(
+    val query: String = "",
+    val results: List<ItemUi> = emptyList()
+)
 
-Stateless-компонент легше перевикористовувати.
-
-3. **Де має жити state**
-
-Практичне правило:
-
-- якщо state потрібен тільки одному маленькому компоненту — можна `remember`;
-- якщо state потрібен parent-у або sibling-ам — hoist до спільного parent;
-- якщо state є screen/business state — тримати у ViewModel;
-- якщо state має пережити configuration change/process death — ViewModel + saved state або `rememberSaveable`.
-
-Приклад screen-level state:
-
-```kotlin
 class SearchViewModel : ViewModel() {
-    private val _state = MutableStateFlow(SearchUiState())
-    val state = _state.asStateFlow()
+    private val _state = MutableStateFlow(SearchState())
+    val state: StateFlow<SearchState> = _state
 
-    fun onQueryChanged(query: String) {
+    fun onQueryChange(query: String) {
         _state.update { it.copy(query = query) }
     }
 }
 ```
-
-Compose:
 
 ```kotlin
 @Composable
@@ -18441,229 +18148,81 @@ fun SearchRoute(viewModel: SearchViewModel) {
 
     SearchScreen(
         state = state,
-        onQueryChange = viewModel::onQueryChanged
+        onQueryChange = viewModel::onQueryChange
     )
 }
 ```
 
-4. **State hoisting у Screen**
+4. **Stateless і stateful composables**
+
+Добра практика — розділяти:
 
 ```kotlin
+@Composable
+fun SearchRoute(viewModel: SearchViewModel) {
+    // stateful: бере state з ViewModel
+}
+
 @Composable
 fun SearchScreen(
-    state: SearchUiState,
+    state: SearchState,
     onQueryChange: (String) -> Unit
 ) {
-    Column {
-        SearchField(
-            query = state.query,
-            onQueryChange = onQueryChange
-        )
-
-        SearchResults(results = state.results)
-    }
+    // stateless: тільки рендерить state
 }
 ```
 
-`SearchField` не знає про ViewModel, API або search logic. Він тільки рендерить `query` і повідомляє про зміни.
+`Route` знає про ViewModel. `Screen` не знає про ViewModel і легше тестується/preview-иться.
 
-5. **Unidirectional data flow**
+5. **Single source of truth**
 
-State hoisting підтримує однонаправлений потік даних:
+State hoisting створює один source of truth:
 
 ```text
-State down
-Events up
+state живе зверху -> child рендерить -> child відправляє event -> parent оновлює state
 ```
 
-Тобто:
+Це зменшує баги, коли різні компоненти тримають різні версії одного значення.
 
-- parent передає state вниз;
-- child відправляє events вгору;
-- owner state вирішує, як змінити state;
-- UI rerender-иться.
+6. **Коли не треба hoist-ити все**
 
-```kotlin
-@Composable
-fun LoginScreen(
-    email: String,
-    onEmailChange: (String) -> Unit,
-    onLoginClick: () -> Unit
-) {
-    TextField(
-        value = email,
-        onValueChange = onEmailChange
-    )
+Не кожен локальний state треба піднімати. Наприклад, внутрішній animation progress, ripple або тимчасовий expanded state може залишитись всередині компонента, якщо parent не має ним керувати.
 
-    Button(onClick = onLoginClick) {
-        Text("Login")
-    }
-}
-```
-
-6. **Навіщо це потрібно**
-
-State hoisting дає:
-
-- reusable components;
-- легше тестування;
-- менше дублювання state;
-- кращий контроль lifecycle;
-- простіше debug state changes;
-- сумісність із MVVM/MVI;
-- простіший preview у Compose;
-- чіткий ownership state.
-
-7. **Controlled vs uncontrolled components**
-
-Controlled component:
-
-```kotlin
-@Composable
-fun AppTextField(
-    value: String,
-    onValueChange: (String) -> Unit
-) {
-    TextField(value = value, onValueChange = onValueChange)
-}
-```
-
-Uncontrolled component:
-
-```kotlin
-@Composable
-fun AppTextField() {
-    var value by remember { mutableStateOf("") }
-    TextField(value = value, onValueChange = { value = it })
-}
-```
-
-Для design system і shared UI майже завжди краще controlled variant.
-
-8. **Іноді варто мати обидві версії**
-
-Можна зробити stateless core і stateful wrapper:
-
-```kotlin
-@Composable
-fun ExpandableCard(
-    expanded: Boolean,
-    onExpandedChange: (Boolean) -> Unit,
-    content: @Composable () -> Unit
-) {
-    Column {
-        Button(onClick = { onExpandedChange(!expanded) }) {
-            Text(if (expanded) "Collapse" else "Expand")
-        }
-
-        if (expanded) {
-            content()
-        }
-    }
-}
-```
-
-Wrapper:
-
-```kotlin
-@Composable
-fun ExpandableCard(
-    content: @Composable () -> Unit
-) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
-
-    ExpandableCard(
-        expanded = expanded,
-        onExpandedChange = { expanded = it },
-        content = content
-    )
-}
-```
-
-Так API зручний, але core component лишається контрольованим.
-
-9. **Помилки при state hoisting**
-
-Типові помилки:
-
-- піднімати state занадто високо;
-- тримати локальний UI-only state у ViewModel без потреби;
-- передавати цілий ViewModel у маленький composable;
-- дублювати один і той самий state у child і parent;
-- не передавати callback для зміни state;
-- робити child відповідальним за business logic.
-
-Погано:
-
-```kotlin
-@Composable
-fun UserNameInput(viewModel: ProfileViewModel) {
-    val state by viewModel.state.collectAsState()
-    TextField(
-        value = state.name,
-        onValueChange = viewModel::onNameChanged
-    )
-}
-```
-
-Краще:
-
-```kotlin
-@Composable
-fun UserNameInput(
-    name: String,
-    onNameChange: (String) -> Unit
-) {
-    TextField(
-        value = name,
-        onValueChange = onNameChange
-    )
-}
-```
-
-10. **Коли не треба hoist**
-
-Не кожен state треба виносити у ViewModel.
-
-Наприклад, локальний visual state:
-
-```kotlin
-@Composable
-fun PasswordField() {
-    var passwordVisible by rememberSaveable { mutableStateOf(false) }
-
-    IconButton(onClick = { passwordVisible = !passwordVisible }) {
-        Icon(
-            imageVector = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-            contentDescription = null
-        )
-    }
-}
-```
-
-Якщо цей state нікому більше не потрібен, локальний `rememberSaveable` нормальний.
-
-11. **Практичне правило**
-
-State треба hoist-ити до найнижчого спільного owner-а, якому цей state потрібен.
+Правило:
 
 ```text
-Потрібен тільки child -> remember у child
-Потрібен siblings -> parent
-Потрібен screen/business logic -> ViewModel
-Потрібен app-wide -> app-level state holder/storage
+якщо state потрібен parent-у або іншим composables -> hoist
+якщо state суто внутрішній і не впливає на бізнес-логіку -> можна лишити локально
 ```
 
-12. **Коротко**
+7. **Переваги**
 
-State hoisting — це винесення state з composable в caller і передача його назад через параметри:
+- компонент стає reusable;
+- легше писати previews;
+- легше тестувати UI;
+- простіше синхронізувати кілька child components;
+- менше прихованого mutable state;
+- кращий unidirectional data flow.
+
+8. **Типова структура параметрів**
 
 ```kotlin
-value: T
-onValueChange: (T) -> Unit
+@Composable
+fun ProfileHeader(
+    user: UserUi,
+    isFollowing: Boolean,
+    onFollowClick: () -> Unit,
+    modifier: Modifier = Modifier
+)
 ```
 
-Це основа Compose-підходу `state down, events up`. Так UI стає передбачуваним, reusable, простішим для тестування і краще масштабується в реальних Android-проєктах.
+Спочатку data/state, потім callbacks, потім `modifier`.
+
+9. **Практичне правило**
+
+State hoisting — це не просто “винести var нагору”. Це спосіб зробити UI керованим через state і events. У Compose це базовий патерн для чистої архітектури екранів.
+
+**Коротко:** `state hoisting` — це підняття state у parent і передача в child через `value` + `onValueChange`. Child стає stateless, reusable і testable, а parent або ViewModel стає single source of truth.
 
 </details>
 <details>
@@ -23358,86 +22917,33 @@ SOLID має зменшувати складність, а не створюва
 
 #### Kotlin
 
-SOLID в Android — це практичний спосіб не перетворити Activity, Fragment, ViewModel або Repository на god object. У реальному Android-коді ці принципи допомагають розділяти UI, business logic, data access, navigation, analytics, permissions, caching і platform-specific details.
+SOLID в Android — це набір принципів, який допомагає не перетворювати `Activity`, `Fragment`, `ViewModel` або `Repository` на god object. Практично це про розділення UI, business logic, data layer, platform-specific деталей і залежностей.
 
 1. **S — Single Responsibility Principle**
 
-Клас має мати одну відповідальність і одну основну причину для зміни.
+Клас має мати одну відповідальність.
 
-Погано:
-
-```kotlin
-class LoginViewModel(
-    private val authApi: AuthApi,
-    private val userDao: UserDao,
-    private val analytics: Analytics
-) : ViewModel() {
-
-    fun login(email: String, password: String) {
-        viewModelScope.launch {
-            analytics.track("login_clicked")
-            val response = authApi.login(email, password)
-            userDao.save(response.user.toEntity())
-            _state.value = LoginState.Success
-        }
-    }
-}
-```
-
-ViewModel тут робить забагато:
-
-- викликає API;
-- кешує user;
-- знає mapping;
-- трекає analytics;
-- керує UI state.
-
-Краще:
+Погано, коли `ViewModel` одночасно викликає API, кешує дані, мапить DTO, трекає analytics і оновлює UI state.
 
 ```kotlin
 class LoginViewModel(
     private val loginUseCase: LoginUseCase
-) : ViewModel() {
-
-    fun onLoginClick(email: String, password: String) {
-        viewModelScope.launch {
-            _state.value = LoginState.Loading
-            _state.value = when (loginUseCase(email, password)) {
-                LoginResult.Success -> LoginState.Success
-                LoginResult.InvalidCredentials -> LoginState.Error("Invalid credentials")
-            }
-        }
-    }
-}
+) : ViewModel()
 ```
-
-ViewModel відповідає за UI state, use case — за сценарій login.
-
-2. **SRP у Fragment**
-
-Погано:
-
-```kotlin
-class ProfileFragment : Fragment() {
-    fun loadUser() {}
-    fun saveUserToDb() {}
-    fun validateForm() {}
-    fun sendAnalytics() {}
-    fun renderUser() {}
-}
-```
-
-Fragment не має бути місцем для всього.
 
 Краще:
 
-- Fragment/Composable — render + user events;
-- ViewModel — UI state + screen logic;
-- UseCase — business scenario;
-- Repository — data access;
-- AnalyticsTracker — analytics.
+```text
+Fragment/Composable -> render + user events
+ViewModel           -> UI state
+UseCase             -> business scenario
+Repository          -> data access abstraction
+DataSource          -> Retrofit/Room/DataStore
+```
 
-3. **O — Open/Closed Principle**
+`ViewModel` не має знати, як саме працює Retrofit або Room.
+
+2. **O — Open/Closed Principle**
 
 Код має розширюватися без постійної модифікації існуючої логіки.
 
@@ -23485,39 +22991,9 @@ class NotificationSender(
 }
 ```
 
-Новий канал додається новою реалізацією, а не переписуванням `NotificationSender`.
+Новий канал додається новою реалізацією `NotificationChannel`, а не переписуванням `NotificationSender`. В Android це часто застосовується для analytics, logging, payment methods, auth providers.
 
-4. **OCP в Android analytics**
-
-```kotlin
-interface AnalyticsTracker {
-    fun track(event: AnalyticsEvent)
-}
-
-class FirebaseAnalyticsTracker : AnalyticsTracker {
-    override fun track(event: AnalyticsEvent) {
-        // Firebase
-    }
-}
-
-class DebugAnalyticsTracker : AnalyticsTracker {
-    override fun track(event: AnalyticsEvent) {
-        Log.d("Analytics", event.name)
-    }
-}
-```
-
-Код ViewModel залежить від abstraction:
-
-```kotlin
-class CheckoutViewModel(
-    private val analytics: AnalyticsTracker
-) : ViewModel()
-```
-
-Можна додати Amplitude/Segment без зміни ViewModel.
-
-5. **L — Liskov Substitution Principle**
+3. **L — Liskov Substitution Principle**
 
 Реалізація interface або subclass має поводитися так, щоб її можна було безпечно підставити замість базового типу.
 
@@ -23530,12 +23006,12 @@ interface UserRepository {
 
 class CacheOnlyUserRepository : UserRepository {
     override suspend fun getUser(id: String): User {
-        throw UnsupportedOperationException("Network required")
+        throw UnsupportedOperationException()
     }
 }
 ```
 
-Клієнт очікує, що `getUser` поверне user або нормальну domain error, а не несподівано впаде через unsupported operation.
+Це порушує contract: клієнт очікує user, а отримує несподіваний crash.
 
 Краще:
 
@@ -23545,7 +23021,7 @@ interface UserRepository {
 }
 ```
 
-Або розділити contracts:
+Або розділити контракти:
 
 ```kotlin
 interface RemoteUserRepository {
@@ -23557,23 +23033,7 @@ interface LocalUserRepository {
 }
 ```
 
-6. **LSP в Android permissions**
-
-Погано:
-
-```kotlin
-interface LocationProvider {
-    suspend fun getCurrentLocation(): Location
-}
-
-class NoPermissionLocationProvider : LocationProvider {
-    override suspend fun getCurrentLocation(): Location {
-        throw SecurityException()
-    }
-}
-```
-
-Якщо permission може бути відсутній, contract має це відображати:
+Android-приклад: якщо location permission може бути відсутній, contract має це показувати:
 
 ```kotlin
 sealed interface LocationResult {
@@ -23587,9 +23047,9 @@ interface LocationProvider {
 }
 ```
 
-Тоді будь-яка реалізація дотримується очікуваного contract-а.
+Тоді будь-яка реалізація `LocationProvider` лишається взаємозамінною.
 
-7. **I — Interface Segregation Principle**
+4. **I — Interface Segregation Principle**
 
 Краще маленькі спеціалізовані інтерфейси, ніж один великий.
 
@@ -23606,8 +23066,6 @@ interface MediaController {
     fun castToDevice(deviceId: String)
 }
 ```
-
-Не кожен екран або компонент потребує всі ці методи.
 
 Краще:
 
@@ -23626,25 +23084,7 @@ interface VolumeController {
 }
 ```
 
-Composable або ViewModel залежить тільки від потрібного contract-а.
-
-8. **ISP у Repository**
-
-Погано:
-
-```kotlin
-interface UserRepository {
-    fun observeUsers(): Flow<List<User>>
-    suspend fun getUser(id: String): User
-    suspend fun createUser(user: User)
-    suspend fun deleteUser(id: String)
-    suspend fun uploadAvatar(file: File)
-}
-```
-
-Якщо use case тільки читає user, йому не потрібні write/delete/upload methods.
-
-Краще:
+Те саме для repository/use case contracts:
 
 ```kotlin
 interface ObserveUsers {
@@ -23654,13 +23094,11 @@ interface ObserveUsers {
 interface GetUser {
     suspend fun getUser(id: String): User
 }
-
-interface UpdateUserAvatar {
-    suspend fun uploadAvatar(file: File): AvatarUrl
-}
 ```
 
-9. **D — Dependency Inversion Principle**
+Компонент має залежати тільки від методів, які реально використовує.
+
+5. **D — Dependency Inversion Principle**
 
 High-level logic має залежати від abstractions, а не від Retrofit, Room, Firebase або Android framework напряму.
 
@@ -23676,7 +23114,7 @@ class GetProfileUseCase(
 }
 ```
 
-Use case залежить від Retrofit API.
+Use case напряму залежить від Retrofit API — це погано.
 
 Краще:
 
@@ -23709,9 +23147,7 @@ class RealProfileRepository(
 }
 ```
 
-10. **DIP і тестування**
-
-Завдяки DIP легко тестувати:
+Завдяки цьому use case легко тестувати:
 
 ```kotlin
 class FakeProfileRepository : ProfileRepository {
@@ -23721,17 +23157,7 @@ class FakeProfileRepository : ProfileRepository {
 }
 ```
 
-Тест:
-
-```kotlin
-val useCase = GetProfileUseCase(
-    repository = FakeProfileRepository()
-)
-```
-
-Без DIP довелося б піднімати Retrofit, database або Android context.
-
-11. **Як SOLID виглядає в типовій Android-архітектурі**
+6. **Як SOLID виглядає в Android-архітектурі**
 
 ```text
 Composable/Fragment -> ViewModel -> UseCase -> Repository interface
@@ -23749,7 +23175,7 @@ SOLID тут проявляється так:
 - ISP: use cases залежать від малих contracts;
 - DIP: domain залежить від abstractions, data layer від details.
 
-12. **Практичне правило**
+7. **Практичне правило**
 
 - Activity/Fragment/Composable не мають містити business logic.
 - ViewModel не має напряму створювати Retrofit/Room/Firebase.
@@ -23759,7 +23185,7 @@ SOLID тут проявляється так:
 - Interfaces мають бути маленькими й чесними.
 - Abstractions треба вводити там, де вони реально зменшують coupling.
 
-**Коротко:** SOLID в Android — це спосіб тримати UI, business logic і data details окремо. Він робить код тестованим, модульним і готовим до змін, але його треба застосовувати прагматично, без зайвих abstraction layers там, де вони не дають користі.
+**Коротко:** SOLID в Android — це спосіб тримати UI, business logic і data details окремо. Він робить код тестованим, модульним і готовим до змін, але застосовувати його треба прагматично, без зайвих abstraction layers там, де вони не дають користі.
 
 </details>
 <details>
@@ -34338,43 +33764,41 @@ class ProfilePagerAdapter(fragment: Fragment) : FragmentStateAdapter(fragment) {
 
 #### Kotlin
 
-`Application` — це singleton-обʼєкт процесу Android-додатка. Він створюється раніше за `Activity`, `Service` або `BroadcastReceiver` у цьому процесі і живе, поки живе процес. Основні callbacks у `Application`: `onCreate()`, `onTerminate()`, `onLowMemory()`, `onTrimMemory()`, а також реєстрація lifecycle callbacks для Activity через `registerActivityLifecycleCallbacks()`.
+`Application` — це singleton-обʼєкт процесу Android-додатка. Він створюється раніше за `Activity`, `Service` або `BroadcastReceiver` у цьому процесі й живе, поки живе процес. Основні callbacks: `onCreate()`, `onTerminate()`, `onLowMemory()`, `onTrimMemory()`, `onConfigurationChanged()`. Також через `Application` часто реєструють `ActivityLifecycleCallbacks`.
 
 1. **onCreate**
 
-`onCreate()` викликається при старті процесу додатка:
+Викликається при старті процесу додатка:
 
 ```kotlin
 class App : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        // init DI
-        // init logging
-        // init analytics
-        // init crash reporting
+        // DI
+        // logging
+        // crash reporting
+        // analytics setup
     }
 }
 ```
 
 Типові задачі:
 
-- ініціалізація dependency injection;
-- налаштування logging;
-- ініціалізація crash reporting;
-- створення application-level конфігурації;
-- реєстрація глобальних callbacks.
+- ініціалізація Hilt/DI;
+- logging;
+- crash reporting;
+- app-wide SDK setup;
+- реєстрація lifecycle callbacks.
 
-Важливо: `onCreate()` має бути швидким. Важкі операції на main thread під час старту можуть погіршити cold start.
+Важливо: `onCreate()` має бути швидким. Важка робота на main thread погіршує cold start.
 
-2. **Оголошення Application у Manifest**
+2. **Manifest**
 
 ```xml
 <application
     android:name=".App"
     android:theme="@style/AppTheme">
-
-    ...
 
 </application>
 ```
@@ -34389,25 +33813,24 @@ override fun onTerminate() {
 }
 ```
 
-У production на реальних Android-девайсах на цей callback покладатися не можна. Документаційно він призначений переважно для emulated process environments. Система може просто вбити процес без виклику `onTerminate()`.
+У production на реальних Android-девайсах на нього покладатися не можна. Система може просто вбити процес без виклику `onTerminate()`.
 
-Практичне правило: не зберігати критичні дані в `onTerminate()`.
+Практичне правило: не зберігати важливі дані й не робити critical cleanup в `onTerminate()`.
 
 4. **onLowMemory**
 
 ```kotlin
 override fun onLowMemory() {
     super.onLowMemory()
-
     imageCache.clear()
 }
 ```
 
-Викликається, коли система повідомляє додаток про критично низький рівень памʼяті. Тут можна звільнити кеші або інші не критичні ресурси.
+Викликається при критично низькій памʼяті. Тут можна звільнити кеші або некритичні ресурси.
 
 5. **onTrimMemory**
 
-`onTrimMemory(level: Int)` дає більш точний сигнал про memory pressure:
+Дає точніший сигнал про memory pressure:
 
 ```kotlin
 override fun onTrimMemory(level: Int) {
@@ -34415,30 +33838,24 @@ override fun onTrimMemory(level: Int) {
 
     when (level) {
         TRIM_MEMORY_RUNNING_LOW,
-        TRIM_MEMORY_RUNNING_CRITICAL -> {
-            imageCache.clear()
-        }
+        TRIM_MEMORY_RUNNING_CRITICAL -> imageCache.clear()
 
-        TRIM_MEMORY_UI_HIDDEN -> {
-            screenCache.clear()
-        }
+        TRIM_MEMORY_UI_HIDDEN -> screenCache.clear()
     }
 }
 ```
 
-Цей callback корисніший за `onLowMemory()`, бо показує рівень тиску на памʼять.
+`TRIM_MEMORY_UI_HIDDEN` означає, що UI додатка більше не видимий. Це хороший момент звільнити UI-related ресурси, але не critical state.
 
-6. **TRIM_MEMORY_UI_HIDDEN**
+6. **onConfigurationChanged**
 
 ```kotlin
-override fun onTrimMemory(level: Int) {
-    if (level == TRIM_MEMORY_UI_HIDDEN) {
-        // app UI is no longer visible
-    }
+override fun onConfigurationChanged(newConfig: Configuration) {
+    super.onConfigurationChanged(newConfig)
 }
 ```
 
-Це означає, що UI додатка більше не видимий користувачу. Можна звільнити UI-related ресурси, але не треба чистити критичний state.
+Application може отримувати configuration callbacks, але UI-specific configuration handling краще робити на рівні Activity/Fragment/Compose.
 
 7. **ActivityLifecycleCallbacks**
 
@@ -34451,120 +33868,78 @@ class App : Application() {
 
         registerActivityLifecycleCallbacks(
             object : ActivityLifecycleCallbacks {
+                override fun onActivityStarted(activity: Activity) = Unit
+                override fun onActivityResumed(activity: Activity) = Unit
+                override fun onActivityPaused(activity: Activity) = Unit
+                override fun onActivityStopped(activity: Activity) = Unit
+                override fun onActivityDestroyed(activity: Activity) = Unit
+
                 override fun onActivityCreated(
                     activity: Activity,
                     savedInstanceState: Bundle?
                 ) = Unit
-
-                override fun onActivityStarted(activity: Activity) = Unit
-
-                override fun onActivityResumed(activity: Activity) = Unit
-
-                override fun onActivityPaused(activity: Activity) = Unit
-
-                override fun onActivityStopped(activity: Activity) = Unit
 
                 override fun onActivitySaveInstanceState(
                     activity: Activity,
                     outState: Bundle
                 ) = Unit
-
-                override fun onActivityDestroyed(activity: Activity) = Unit
             }
         )
     }
 }
 ```
 
-Це використовують для analytics, foreground/background detection, session tracking, debug tooling.
+Використання:
 
-8. **Визначення foreground/background**
+- analytics screen tracking;
+- foreground/background detection;
+- session tracking;
+- debug tooling;
+- global activity monitoring.
 
-Приклад спрощеного лічильника started Activity:
+8. **Foreground/background detection**
+
+Спрощена ідея:
 
 ```kotlin
-class App : Application() {
-    private var startedActivities = 0
+private var startedActivities = 0
 
-    override fun onCreate() {
-        super.onCreate()
+override fun onActivityStarted(activity: Activity) {
+    startedActivities++
+    if (startedActivities == 1) onAppForeground()
+}
 
-        registerActivityLifecycleCallbacks(
-            object : ActivityLifecycleCallbacks {
-                override fun onActivityStarted(activity: Activity) {
-                    startedActivities++
-                    if (startedActivities == 1) {
-                        onAppForeground()
-                    }
-                }
-
-                override fun onActivityStopped(activity: Activity) {
-                    startedActivities--
-                    if (startedActivities == 0) {
-                        onAppBackground()
-                    }
-                }
-
-                override fun onActivityCreated(
-                    activity: Activity,
-                    savedInstanceState: Bundle?
-                ) = Unit
-
-                override fun onActivityResumed(activity: Activity) = Unit
-                override fun onActivityPaused(activity: Activity) = Unit
-                override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
-                override fun onActivityDestroyed(activity: Activity) = Unit
-            }
-        )
-    }
-
-    private fun onAppForeground() {
-        // analytics/session start
-    }
-
-    private fun onAppBackground() {
-        // analytics/session end
-    }
+override fun onActivityStopped(activity: Activity) {
+    startedActivities--
+    if (startedActivities == 0) onAppBackground()
 }
 ```
 
 У production краще враховувати configuration changes і edge cases або використовувати `ProcessLifecycleOwner`.
 
-9. **ComponentCallbacks**
+9. **Чого не робити в Application**
 
-`Application` також реалізує `ComponentCallbacks2`, тому може отримувати memory/configuration callbacks:
-
-```kotlin
-override fun onConfigurationChanged(newConfig: Configuration) {
-    super.onConfigurationChanged(newConfig)
-}
-```
-
-`onConfigurationChanged()` викликається, якщо application component отримує зміну конфігурації. Але більшість UI-specific configuration handling краще робити на рівні Activity/Fragment/Compose.
-
-10. **Чого не треба робити в Application**
-
-Погані ідеї:
-
-- запускати важкі network/database операції в `onCreate()`;
-- тримати посилання на `Activity`;
-- використовувати `Application` як global mutable storage;
-- складати туди business logic;
-- очікувати, що `onTerminate()` гарантовано викличеться.
-
-Приклад проблеми:
+Погано:
 
 ```kotlin
-object AppHolder {
+class App : Application() {
     var currentActivity: Activity? = null
+    var currentUser: User? = null
 }
 ```
 
-Це прямий шлях до memory leak.
+Проблеми:
 
-11. **Application і Hilt**
+- `Activity` reference може створити memory leak;
+- process може бути вбитий, і state зникне;
+- business logic стає глобальною;
+- тестування ускладнюється.
 
-У Hilt application клас позначають `@HiltAndroidApp`:
+`Application` не має бути global mutable storage.
+
+10. **Hilt**
+
+Для Hilt:
 
 ```kotlin
 @HiltAndroidApp
@@ -34573,14 +33948,15 @@ class App : Application()
 
 Це запускає генерацію application-level dependency graph.
 
-12. **Практичне правило**
+11. **Практичне правило**
 
 - `onCreate()` — lightweight global initialization.
 - `onTrimMemory()` — реакція на memory pressure.
 - `onLowMemory()` — fallback для критичної нестачі памʼяті.
 - `onTerminate()` — не використовувати для production cleanup.
-- `registerActivityLifecycleCallbacks()` — глобальне спостереження за Activity lifecycle.
-- Не тримати Activity/Fragment/View у `Application`.
+- `ActivityLifecycleCallbacks` — глобальне спостереження за Activity lifecycle.
+- Не тримати `Activity`, `Fragment` або `View` у `Application`.
+- Не використовувати `Application` як сховище business state.
 
 **Коротко:** головний callback `Application` — `onCreate()`. Для памʼяті є `onTrimMemory()` і `onLowMemory()`, `onTerminate()` не гарантується, а для lifecycle усіх Activity використовується `registerActivityLifecycleCallbacks()`.
 
@@ -35070,281 +34446,164 @@ startActivity(intent)
 
 #### Kotlin
 
-ANR (`Application Not Responding`) виникає, коли Android бачить, що додаток занадто довго не відповідає на важливі події. Найчастіше причина — блокування main thread: довгі обчислення, синхронний network/database/file I/O, deadlock, важкий `BroadcastReceiver` або зависання під час обробки input event.
+`ANR` виникає, коли main thread Android-додатка занадто довго не відповідає на системні події. Система вважає застосунок “завислим” і показує діалог Application Not Responding.
 
-1. **Головна причина — заблокований main thread**
+1. **Головна причина**
 
-Main thread відповідає за UI, input events, lifecycle callbacks і dispatch повідомлень через Looper. Якщо його заблокувати, система не може обробити дотики, redraw або lifecycle.
-
-Погано:
+ANR майже завжди означає, що main thread заблокований:
 
 ```kotlin
 button.setOnClickListener {
-    Thread.sleep(10_000)
+    Thread.sleep(10_000) // погано: блокує main thread
 }
 ```
 
-UI зависне, і система може показати ANR dialog.
+Main thread має швидко обробляти input, lifecycle, rendering і callbacks. Якщо він зайнятий довгою роботою, UI перестає відповідати.
 
-2. **Довгі операції в onCreate/onStart/onResume**
+2. **Довгі операції на main thread**
 
-Погано:
+Типові помилки:
+
+- network request на main thread;
+- читання/запис великих файлів;
+- важкий JSON parsing;
+- bitmap decoding;
+- database query без background dispatcher;
+- складні цикли або сортування великих колекцій.
+
+Правильно переносити роботу в `Dispatchers.IO` або `Dispatchers.Default`:
 
 ```kotlin
-class MainActivity : AppCompatActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-
-        val users = api.getUsersBlocking()
-        render(users)
+viewModelScope.launch {
+    val result = withContext(Dispatchers.IO) {
+        repository.loadData()
     }
+    _state.value = State.Success(result)
 }
 ```
 
-Lifecycle callbacks виконуються на main thread. Якщо там зробити довгу синхронну операцію, перший frame або input handling буде заблокований.
+3. **BroadcastReceiver**
 
-Правильно:
+ANR можна отримати, якщо `BroadcastReceiver.onReceive()` виконується занадто довго:
 
 ```kotlin
-class MainViewModel(
-    private val repository: UserRepository
-) : ViewModel() {
-    fun load() {
-        viewModelScope.launch {
-            val users = repository.getUsers()
-            _state.value = UsersState.Content(users)
-        }
+override fun onReceive(context: Context, intent: Intent) {
+    // погано: довга синхронна робота
+}
+```
+
+`onReceive()` має швидко завершуватись. Для довшої роботи краще запускати `WorkManager` або використовувати `goAsync()` дуже обережно.
+
+4. **Service**
+
+`Service` теж працює на main thread, якщо явно не винести роботу в background:
+
+```kotlin
+override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    scope.launch(Dispatchers.IO) {
+        syncData()
+        stopSelf(startId)
     }
+    return START_NOT_STICKY
 }
 ```
 
-3. **Network на main thread**
+Помилка — думати, що Service автоматично дає окремий потік.
 
-Синхронний network call на main thread — класичний шлях до зависання:
+5. **Deadlock і lock contention**
 
-```kotlin
-val response = okHttpClient.newCall(request).execute()
-```
-
-У Kotlin Coroutines треба виконувати blocking I/O на `Dispatchers.IO`:
-
-```kotlin
-suspend fun getUsers(): List<User> = withContext(Dispatchers.IO) {
-    api.getUsersBlocking()
-}
-```
-
-Якщо використовується Retrofit suspend API, він зазвичай сам не блокує main thread, але важку post-processing логіку все одно треба контролювати.
-
-4. **Database/file I/O на main thread**
-
-Погано:
-
-```kotlin
-val users = database.userDao().getUsersBlocking()
-```
-
-Правильно:
-
-```kotlin
-suspend fun loadUsers(): List<User> = withContext(Dispatchers.IO) {
-    database.userDao().getUsersBlocking()
-}
-```
-
-Room зазвичай не дозволяє database access на main thread, якщо явно не ввімкнути `allowMainThreadQueries()`. У production так робити не треба.
-
-5. **Важкі обчислення на main thread**
-
-Погано:
-
-```kotlin
-val result = hugeList
-    .map { heavyTransform(it) }
-    .sortedBy { it.score }
-```
-
-Якщо список великий, це може заблокувати UI. CPU-heavy роботу краще переносити на `Dispatchers.Default`:
-
-```kotlin
-suspend fun calculate(items: List<Item>): List<Result> {
-    return withContext(Dispatchers.Default) {
-        items
-            .map { heavyTransform(it) }
-            .sortedBy { it.score }
-    }
-}
-```
-
-6. **BroadcastReceiver виконується занадто довго**
-
-`BroadcastReceiver.onReceive()` має завершуватися швидко:
-
-```kotlin
-class SyncReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
-        // Погано: довга синхронна робота тут
-    }
-}
-```
-
-Для довгої роботи треба делегувати в `WorkManager`:
-
-```kotlin
-class SyncReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
-        WorkManager.getInstance(context)
-            .enqueue(OneTimeWorkRequest.from(SyncWorker::class.java))
-    }
-}
-```
-
-7. **Service теж може спричинити ANR**
-
-`Service` за замовчуванням працює на main thread:
-
-```kotlin
-class SyncService : Service() {
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Погано: blocking sync тут
-        return START_NOT_STICKY
-    }
-}
-```
-
-Якщо потрібна фонова робота, треба використовувати coroutine/worker/thread:
-
-```kotlin
-class SyncService : LifecycleService() {
-    override fun onCreate() {
-        super.onCreate()
-
-        lifecycleScope.launch(Dispatchers.IO) {
-            syncRepository.sync()
-            stopSelf()
-        }
-    }
-}
-```
-
-Для більшості deferrable background tasks краще `WorkManager`.
-
-8. **Deadlock**
-
-ANR може бути не тільки від довгого коду, а й від deadlock:
+ANR може зʼявитись через блокування locks:
 
 ```kotlin
 synchronized(lock) {
-    runBlocking {
-        withContext(Dispatchers.Main) {
-            updateUi()
-        }
-    }
+    // main thread чекає ресурс, який тримає background thread
 }
 ```
 
-Особливо небезпечно блокувати main thread через `runBlocking`, locks, `CountDownLatch.await()`, `Future.get()` або очікування callback, який сам має прийти на main thread.
+Особливо небезпечно, коли main thread чекає результат background thread, а background thread чекає main thread.
 
-9. **runBlocking на main thread**
+6. **Binder calls**
 
-Погано:
+Синхронні IPC/Binder calls можуть заблокувати main thread, якщо інший процес повільний або завис:
 
 ```kotlin
-fun onClick() {
-    runBlocking {
-        repository.sync()
-    }
-}
+val result = remoteService.getData() // ризик, якщо виклик синхронний
 ```
 
-`runBlocking` блокує поточний thread. Якщо поточний thread — main, UI зависне.
+Такі виклики краще не робити напряму з UI thread.
 
-Правильно:
+7. **Повільний rendering**
 
-```kotlin
-fun onClick() {
-    viewModelScope.launch {
-        repository.sync()
-    }
-}
-```
+Формально це частіше jank, але дуже важкий UI може привести до зависання:
 
-10. **Важкий rendering або layout**
+- надто складний layout;
+- дорогі custom `onDraw()`;
+- великі allocations під час rendering;
+- блокуючі операції в Compose/View callbacks.
 
-ANR може виникнути через надто складний UI:
+Custom drawing і Compose recomposition мають бути легкими.
 
-- глибока View hierarchy;
-- важка робота в `onDraw()`;
-- синхронне декодування bitmap;
-- великі списки без virtualization;
-- складна recomposition у Compose через неправильний state.
+8. **Як діагностувати ANR**
 
-Погано:
-
-```kotlin
-override fun onDraw(canvas: Canvas) {
-    val bitmap = BitmapFactory.decodeFile(path)
-    canvas.drawBitmap(bitmap, 0f, 0f, null)
-}
-```
-
-Декодування треба робити поза `onDraw()`, а в `onDraw()` тільки малювати вже підготовлені дані.
-
-11. **Input dispatch timeout**
-
-Один з типових ANR-сценаріїв: користувач натиснув на екран, а додаток не обробив input event вчасно, бо main thread зайнятий:
-
-```text
-User taps button
-Main thread busy
-Input event waits
-Timeout
-ANR
-```
-
-Тому будь-який click listener, text watcher, adapter binding або Compose callback не має виконувати важку роботу синхронно.
-
-12. **Як діагностувати ANR**
-
-Практичні інструменти:
+Основні інструменти:
 
 - Android Studio Profiler;
-- traces / ANR traces;
-- `adb bugreport`;
+- Logcat;
+- ANR traces;
 - Play Console ANR reports;
 - StrictMode;
-- logs навколо long-running operations;
-- performance monitoring SDK.
+- Perfetto/System Trace.
 
-StrictMode для debug:
+`StrictMode` допомагає рано ловити disk/network роботу на main thread:
 
 ```kotlin
-if (BuildConfig.DEBUG) {
-    StrictMode.setThreadPolicy(
-        StrictMode.ThreadPolicy.Builder()
-            .detectDiskReads()
-            .detectDiskWrites()
-            .detectNetwork()
-            .penaltyLog()
-            .build()
-    )
+StrictMode.setThreadPolicy(
+    StrictMode.ThreadPolicy.Builder()
+        .detectDiskReads()
+        .detectDiskWrites()
+        .detectNetwork()
+        .penaltyLog()
+        .build()
+)
+```
+
+9. **Як уникати ANR**
+
+Практичні правила:
+
+- не блокувати main thread;
+- переносити I/O в `Dispatchers.IO`;
+- CPU-heavy роботу — в `Dispatchers.Default`;
+- не робити synchronous wait типу `runBlocking` у UI;
+- не тримати locks на main thread;
+- не виконувати довгу роботу в `BroadcastReceiver`;
+- профілювати складні екрани;
+- додавати timeouts для зовнішніх викликів.
+
+10. **Типовий поганий приклад**
+
+```kotlin
+fun loadProfile() = runBlocking {
+    repository.fetchProfile()
 }
 ```
 
-Це допомагає знайти I/O на main thread.
+`runBlocking` на main thread блокує UI і може привести до ANR.
 
-13. **Практичне правило**
+Краще:
 
-- Main thread — тільки для UI і швидкої coordination logic.
-- Network/file/database I/O — `Dispatchers.IO`.
-- CPU-heavy робота — `Dispatchers.Default`.
-- Не використовувати `runBlocking` на main thread.
-- Не робити важку роботу в `BroadcastReceiver.onReceive()`.
-- Не блокувати lifecycle callbacks.
-- Для довгих background tasks використовувати `WorkManager`.
-- У debug вмикати `StrictMode`.
+```kotlin
+fun loadProfile() {
+    viewModelScope.launch {
+        val profile = withContext(Dispatchers.IO) {
+            repository.fetchProfile()
+        }
+        _state.value = ProfileState(profile)
+    }
+}
+```
 
-**Коротко:** ANR виникає, коли main thread або важливий component callback занадто довго не відповідає. Найчастіші причини — blocking I/O, важкі обчислення, `runBlocking`, deadlock, довгий `BroadcastReceiver`, важкий lifecycle код або складний rendering.
+**Коротко:** ANR виникає, коли main thread довго не відповідає. Основні причини — blocking I/O, важкі CPU-операції, довгі `BroadcastReceiver`/`Service` callbacks, locks, synchronous IPC і неправильне використання `runBlocking`. Профілактика — не блокувати UI thread, переносити роботу на правильні dispatchers і профілювати проблемні місця.
 
 </details>
 <details>
@@ -35829,96 +35088,55 @@ Application       -> onCreate/onTrimMemory
 
 #### Kotlin
 
-`Service` — це Android component для виконання роботи без прямого UI. Його може запускати система, `Activity`, інший component або інший додаток через IPC. Важливе уточнення: `Service` сам по собі не створює background thread. Його lifecycle callbacks за замовчуванням виконуються на main thread, тому довгу роботу треба переносити в coroutine/thread/worker.
+`Service` — це Android component для роботи у фоні без власного UI. Він живе окремо від `Activity`, але все одно працює в процесі застосунку і за замовчуванням на main thread. Тому довгі операції всередині `Service` треба переносити в coroutine, thread, executor або інший async-механізм.
 
 1. **Для чого потрібен Service**
 
-`Service` використовують, коли робота має виконуватися без екрана:
+Service використовують, коли робота має продовжуватись без активного екрана:
 
-- music playback;
-- location tracking;
-- file upload/download;
-- sync;
-- bound API для інших components;
-- foreground operation з notification.
+- програвання музики;
+- синхронізація даних;
+- завантаження файлів;
+- foreground tracking;
+- робота з long-running operation;
+- взаємодія з іншим компонентом через binding.
 
-Простий skeleton:
+Але Service не означає “окремий потік”. Це часта помилка на співбесідах.
 
-```kotlin
-class SyncService : Service() {
-    override fun onBind(intent: Intent?): IBinder? = null
-}
-```
+2. **Started Service**
 
-2. **Service не дорівнює background thread**
-
-Погано:
+Started service запускається через `startService()` або `ContextCompat.startForegroundService()`:
 
 ```kotlin
 class SyncService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        repository.syncBlocking()
-        return START_NOT_STICKY
-    }
-}
-```
-
-`onStartCommand()` виконується на main thread. Якщо `syncBlocking()` довгий, можна отримати ANR.
-
-Краще:
-
-```kotlin
-class SyncService : Service() {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        scope.launch {
-            repository.sync()
+        CoroutineScope(Dispatchers.IO).launch {
+            syncData()
             stopSelf(startId)
         }
 
         return START_NOT_STICKY
     }
 
-    override fun onDestroy() {
-        scope.cancel()
-        super.onDestroy()
-    }
-
     override fun onBind(intent: Intent?): IBinder? = null
 }
 ```
 
-3. **Started Service**
+Такий Service виконує задачу і сам себе зупиняє через `stopSelf()`.
 
-Started service запускається через `startService()` або `ContextCompat.startForegroundService()`:
+3. **Bound Service**
 
-```kotlin
-val intent = Intent(context, SyncService::class.java)
-context.startService(intent)
-```
-
-Lifecycle:
-
-```text
-onCreate -> onStartCommand -> running -> stopSelf/stopService -> onDestroy
-```
-
-Started service працює, поки сам себе не зупинить або його не зупинить інший component.
-
-4. **Bound Service**
-
-Bound service дозволяє іншим components привʼязатися до сервісу і викликати його API:
+Bound service дозволяє іншому компоненту підʼєднатись і викликати методи сервісу:
 
 ```kotlin
 class PlayerService : Service() {
-    private val binder = PlayerBinder()
+    private val binder = LocalBinder()
 
-    inner class PlayerBinder : Binder() {
-        fun getService(): PlayerService = this@PlayerService
+    inner class LocalBinder : Binder() {
+        fun service(): PlayerService = this@PlayerService
     }
 
-    override fun onBind(intent: Intent?): IBinder = binder
+    override fun onBind(intent: Intent): IBinder = binder
 
     fun play() {
         // start playback
@@ -35926,61 +35144,26 @@ class PlayerService : Service() {
 }
 ```
 
-Activity може привʼязатися:
+Він живе, поки є bound clients, або довше, якщо паралельно був запущений як started service.
+
+4. **Foreground Service**
+
+Foreground service потрібен для помітної для користувача довгої роботи. Він має показувати notification:
 
 ```kotlin
-bindService(
-    Intent(this, PlayerService::class.java),
-    connection,
-    Context.BIND_AUTO_CREATE
-)
-```
-
-Bound service живе, поки є хоча б один bound client, якщо він не запущений ще й як started service.
-
-5. **Foreground Service**
-
-Foreground service — це service для задач, які помітні користувачу і мають notification:
-
-```kotlin
-class LocationService : Service() {
-    override fun onCreate() {
-        super.onCreate()
-
-        startForeground(
-            NOTIFICATION_ID,
-            createNotification()
-        )
+class PlayerService : Service() {
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        startForeground(NOTIFICATION_ID, createNotification())
+        return START_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 }
 ```
 
-Типові приклади:
+Приклади: media playback, location tracking, active file upload/download. Якщо задача не є user-visible, foreground service часто буде неправильним вибором.
 
-- navigation;
-- active location sharing;
-- music playback;
-- ongoing call;
-- fitness tracking.
-
-На сучасному Android foreground services мають суворі обмеження, типи і permission requirements.
-
-6. **startForegroundService**
-
-Для запуску foreground service:
-
-```kotlin
-ContextCompat.startForegroundService(
-    context,
-    Intent(context, LocationService::class.java)
-)
-```
-
-Після старту сервіс має швидко викликати `startForeground()` з notification. Якщо цього не зробити, система може зупинити додаток.
-
-7. **Service lifecycle**
+5. **Lifecycle Service**
 
 Основні callbacks:
 
@@ -35993,113 +35176,67 @@ override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
     return START_NOT_STICKY
 }
 
-override fun onBind(intent: Intent?): IBinder? {
-    return null
-}
-
-override fun onUnbind(intent: Intent?): Boolean {
-    return super.onUnbind(intent)
-}
+override fun onBind(intent: Intent?): IBinder? = null
 
 override fun onDestroy() {
     super.onDestroy()
 }
 ```
 
-`onCreate()` викликається один раз при створенні service instance.  
-`onStartCommand()` може викликатися багато разів для різних intents.
+`onCreate()` викликається один раз на створення. `onStartCommand()` — на кожен start request. `onDestroy()` — для cleanup.
 
-8. **START_STICKY, START_NOT_STICKY, START_REDELIVER_INTENT**
+6. **START_STICKY / NOT_STICKY / REDELIVER_INTENT**
 
-Повернення з `onStartCommand()` визначає поведінку після system kill:
+```text
+START_STICKY           -> система може пересоздати Service без старого Intent
+START_NOT_STICKY       -> не пересоздавати автоматично
+START_REDELIVER_INTENT -> пересоздати і повторно доставити останній Intent
+```
+
+Вибір залежить від задачі. Для sync job часто достатньо `START_NOT_STICKY`. Для player — частіше `START_STICKY`.
+
+7. **Service і threading**
+
+Service працює на main thread:
 
 ```kotlin
-override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-    return START_NOT_STICKY
+class SyncService : Service() {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        scope.launch {
+            syncData()
+            stopSelf(startId)
+        }
+        return START_NOT_STICKY
+    }
+
+    override fun onDestroy() {
+        scope.cancel()
+        super.onDestroy()
+    }
+
+    override fun onBind(intent: Intent?): IBinder? = null
 }
 ```
 
-Основні варіанти:
+Головне — не блокувати main thread і скасовувати роботу в `onDestroy()`.
 
-- `START_NOT_STICKY` — не перезапускати автоматично;
-- `START_STICKY` — спробувати перезапустити без обовʼязкового redelivery intent;
-- `START_REDELIVER_INTENT` — перезапустити і передати останній intent.
+8. **Коли Service не потрібен**
 
-Вибір залежить від типу задачі.
+Не варто використовувати Service для будь-якої фонової задачі. Часто кращі варіанти:
 
-9. **Service vs WorkManager**
+- `WorkManager` — deferrable/background work;
+- `AlarmManager` — точний запуск у часі;
+- `JobScheduler` — системно керовані jobs;
+- `DownloadManager` — прості завантаження;
+- `MediaSession` + Media3 — media playback.
 
-Для deferrable background work краще `WorkManager`:
+9. **Практичне правило**
 
-```kotlin
-val request = OneTimeWorkRequestBuilder<SyncWorker>().build()
-WorkManager.getInstance(context).enqueue(request)
-```
+Service потрібен, коли робота має бути привʼязана до Android component lifecycle і може тривати без екрана. Якщо задача має пережити process death, network constraints або reboot, частіше потрібен `WorkManager`, а не Service.
 
-`WorkManager` краще підходить для:
-
-- guaranteed execution;
-- network constraints;
-- retries;
-- periodic work;
-- work after app/process death.
-
-`Service` краще для ongoing роботи, яка має бути активною зараз, особливо якщо вона foreground і visible для користувача.
-
-10. **Service vs Coroutine**
-
-Coroutine — це спосіб організувати async execution.  
-Service — це Android component lifecycle.
-
-Вони не взаємозамінні:
-
-```text
-Service answers: where component lives
-Coroutine answers: how async work runs
-```
-
-У Service можна запускати coroutine, але треба правильно скасувати scope в `onDestroy()`.
-
-11. **Manifest**
-
-Service оголошується в manifest:
-
-```xml
-<service
-    android:name=".SyncService"
-    android:exported="false" />
-```
-
-Якщо service не має бути доступний іншим додаткам, `exported` має бути `false`.
-
-Для foreground service потрібні permissions:
-
-```xml
-<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-```
-
-Для деяких типів foreground service на нових Android потрібні додаткові permissions.
-
-12. **Типові помилки**
-
-- Думати, що `Service` автоматично працює в background thread.
-- Робити blocking work в `onStartCommand()`.
-- Не викликати `stopSelf()`.
-- Не скасовувати coroutine scope в `onDestroy()`.
-- Використовувати Service там, де достатньо `WorkManager`.
-- Запускати foreground service без notification.
-- Робити exported service без потреби.
-
-13. **Практичне правило**
-
-- Для ongoing user-visible задач — foreground service.
-- Для client API всередині app — bound service.
-- Для guaranteed/deferred background work — `WorkManager`.
-- Для короткої async роботи в UI flow — coroutine у ViewModel/use case, не Service.
-- У Service не блокувати main thread.
-- Завжди думати про lifecycle, cancellation і permissions.
-
-**Коротко:** `Service` — це Android component для роботи без UI, але не окремий потік. Він буває started, bound або foreground. Для довгої роботи треба використовувати background execution, а для більшості відкладених задач краще підходить `WorkManager`.
+**Коротко:** `Service` — Android component для роботи без UI. Він не створює окремий thread автоматично. Є started, bound і foreground services. Для довгих задач потрібен async-код, cleanup і правильний вибір між `Service`, `ForegroundService` та `WorkManager`.
 
 </details>
 <details>
@@ -37594,11 +36731,9 @@ binding.content.isVisible = state is Content
 
 #### Kotlin
 
-`View` — базовий клас для UI-елементів у Android View system. У нього багато методів, але на співбесіді важливо знати групи: lifecycle/attachment, measuring/layout/drawing, input events, invalidation, state, visibility, focus, listeners і accessibility. Ключові методи для custom View: `onMeasure()`, `onLayout()`, `onDraw()`, `invalidate()`, `requestLayout()`, `onTouchEvent()`.
+`View` — базовий клас Android UI. Його методи відповідають за lifecycle, вимірювання, layout, малювання, input events, state, visibility, focus і accessibility. Для custom View найважливіші: `onMeasure()`, `onDraw()`, `invalidate()`, `requestLayout()`, `onTouchEvent()` і `performClick()`.
 
-1. **Lifecycle attachment methods**
-
-Ці callbacks показують, коли View додається або видаляється з window:
+1. **Lifecycle attachment**
 
 ```kotlin
 override fun onAttachedToWindow() {
@@ -37610,59 +36745,36 @@ override fun onDetachedFromWindow() {
 }
 ```
 
-Використання:
+`onAttachedToWindow()` викликається, коли View додали до window. `onDetachedFromWindow()` — коли прибрали. Тут зазвичай стартують/зупиняють listeners, animations або звільняють ресурси.
 
-- старт/зупинка animations;
-- реєстрація listeners;
-- звільнення ресурсів;
-- cleanup callback-ів.
+2. **onMeasure**
 
-Не треба тримати long-running work після `onDetachedFromWindow()`.
-
-2. **Measuring: onMeasure**
-
-`onMeasure()` визначає бажаний розмір View:
+`onMeasure()` визначає розмір View:
 
 ```kotlin
 override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-    val desiredWidth = 200
-    val desiredHeight = 100
-
-    val width = resolveSize(desiredWidth, widthMeasureSpec)
-    val height = resolveSize(desiredHeight, heightMeasureSpec)
-
+    val width = resolveSize(200, widthMeasureSpec)
+    val height = resolveSize(100, heightMeasureSpec)
     setMeasuredDimension(width, height)
 }
 ```
 
-`MeasureSpec` передає обмеження від parent:
+`MeasureSpec` приходить від parent і задає constraints: `EXACTLY`, `AT_MOST`, `UNSPECIFIED`.
 
-- `EXACTLY`;
-- `AT_MOST`;
-- `UNSPECIFIED`.
+3. **onLayout**
 
-3. **Layout: onLayout**
-
-`onLayout()` розміщує child views. Для звичайного `View` без children його часто не override-ять. Для custom `ViewGroup` — це ключовий метод:
+Для простого `View` майже не потрібен. Для `ViewGroup` це метод, який розміщує child views:
 
 ```kotlin
-override fun onLayout(
-    changed: Boolean,
-    left: Int,
-    top: Int,
-    right: Int,
-    bottom: Int
-) {
+override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
     val child = getChildAt(0)
     child.layout(0, 0, child.measuredWidth, child.measuredHeight)
 }
 ```
 
-`ViewGroup` має виміряти і розкласти дітей.
+4. **onDraw**
 
-4. **Drawing: onDraw**
-
-`onDraw()` малює View:
+`onDraw()` малює View на `Canvas`:
 
 ```kotlin
 class CircleView(context: Context) : View(context) {
@@ -37671,60 +36783,40 @@ class CircleView(context: Context) : View(context) {
     }
 
     override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
         canvas.drawCircle(width / 2f, height / 2f, 50f, paint)
     }
 }
 ```
 
-У `onDraw()` не можна робити важкі операції: allocation великих обʼєктів, bitmap decoding, network/file I/O.
+У `onDraw()` не можна робити важку роботу: allocation великих обʼєктів, bitmap decoding, file/network I/O.
 
-5. **invalidate**
-
-`invalidate()` просить систему перемалювати View:
+5. **invalidate і requestLayout**
 
 ```kotlin
 fun setProgress(value: Float) {
     progress = value
     invalidate()
 }
-```
 
-Це призведе до майбутнього виклику `onDraw()`.
-
-Використовувати, коли змінився тільки вигляд, але не розмір.
-
-6. **requestLayout**
-
-`requestLayout()` просить систему заново виміряти і розкласти View:
-
-```kotlin
 fun setItems(items: List<Item>) {
     this.items = items
     requestLayout()
 }
 ```
 
-Використовувати, коли зміна впливає на розмір або layout.
+Правило просте:
 
-Часто треба обидва:
-
-```kotlin
-requestLayout()
-invalidate()
+```text
+змінився тільки вигляд -> invalidate()
+змінився розмір/layout -> requestLayout()
 ```
 
-7. **Touch handling: onTouchEvent**
+6. **onTouchEvent і performClick**
 
 ```kotlin
 override fun onTouchEvent(event: MotionEvent): Boolean {
     return when (event.action) {
-        MotionEvent.ACTION_DOWN -> {
-            true
-        }
-        MotionEvent.ACTION_MOVE -> {
-            true
-        }
+        MotionEvent.ACTION_DOWN -> true
         MotionEvent.ACTION_UP -> {
             performClick()
             true
@@ -37732,25 +36824,16 @@ override fun onTouchEvent(event: MotionEvent): Boolean {
         else -> super.onTouchEvent(event)
     }
 }
-```
 
-Якщо View обробляє touch, `ACTION_DOWN` має повернути `true`, інакше наступні events можуть не прийти.
-
-8. **performClick**
-
-Для accessibility треба викликати `performClick()`:
-
-```kotlin
 override fun performClick(): Boolean {
     super.performClick()
-    // custom click behavior
     return true
 }
 ```
 
-Якщо custom View обробляє touch як click, `performClick()` має бути частиною реалізації.
+Якщо View обробляє touch, `ACTION_DOWN` має повернути `true`. Для accessibility click треба проводити через `performClick()`.
 
-9. **Click listeners**
+7. **Listeners**
 
 ```kotlin
 view.setOnClickListener {
@@ -37763,9 +36846,9 @@ view.setOnLongClickListener {
 }
 ```
 
-Listeners виконуються на main thread, тому в них не можна робити довгу роботу.
+Listeners виконуються на main thread, тому довгу роботу треба виносити за межі UI callback.
 
-10. **Visibility methods**
+8. **Visibility і state**
 
 ```kotlin
 view.visibility = View.VISIBLE
@@ -37773,145 +36856,46 @@ view.visibility = View.INVISIBLE
 view.visibility = View.GONE
 ```
 
-Різниця:
-
 ```text
 VISIBLE   -> видно і займає місце
 INVISIBLE -> не видно, але займає місце
 GONE      -> не видно і не займає місце
 ```
 
-KTX:
+Також часто використовуються `isEnabled`, `isSelected`, `isActivated`, `isPressed`.
 
-```kotlin
-view.isVisible = state is Content
-```
-
-11. **Focus methods**
+9. **Focus, state, accessibility**
 
 ```kotlin
 editText.requestFocus()
 view.clearFocus()
-```
-
-Callbacks:
-
-```kotlin
-view.setOnFocusChangeListener { _, hasFocus ->
-    // handle focus
-}
-```
-
-Focus важливий для keyboard navigation, input fields, TV, accessibility.
-
-12. **State methods**
-
-```kotlin
-view.isEnabled = false
-view.isSelected = true
-view.isActivated = true
-view.isPressed = false
-```
-
-Ці стани можуть впливати на selector/drawable:
-
-```xml
-<selector>
-    <item android:state_pressed="true" android:color="@color/pressed" />
-    <item android:color="@color/default" />
-</selector>
-```
-
-13. **Saving View state**
-
-Custom View може зберігати state:
-
-```kotlin
-override fun onSaveInstanceState(): Parcelable? {
-    val superState = super.onSaveInstanceState()
-    return SavedState(superState, progress)
-}
-
-override fun onRestoreInstanceState(state: Parcelable?) {
-    if (state is SavedState) {
-        super.onRestoreInstanceState(state.superState)
-        progress = state.progress
-    } else {
-        super.onRestoreInstanceState(state)
-    }
-}
-```
-
-У production краще уважно реалізовувати `BaseSavedState`/`AbsSavedState`.
-
-14. **Accessibility**
-
-```kotlin
 view.contentDescription = "Profile image"
-view.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
 ```
 
-Custom View має коректно підтримувати accessibility:
+Focus важливий для input fields, keyboard navigation, TV і accessibility. Custom View також може перевизначати `onSaveInstanceState()` / `onRestoreInstanceState()`, якщо має власний state.
 
-- content description;
-- click actions;
-- focus;
-- state description;
-- touch target size.
-
-15. **Layout params**
-
-```kotlin
-view.layoutParams = ViewGroup.MarginLayoutParams(
-    ViewGroup.LayoutParams.MATCH_PARENT,
-    ViewGroup.LayoutParams.WRAP_CONTENT
-)
-```
-
-Зміна layout params зазвичай викликає layout pass.
-
-16. **post**
-
-`post {}` виконує код у message queue View після поточного циклу:
+10. **post**
 
 ```kotlin
 view.post {
-    val width = view.width
+    val measuredWidth = view.width
 }
 ```
 
-Корисно, коли треба дочекатися layout. Але краще не будувати архітектуру на випадкових `post`, якщо є lifecycle-aware спосіб.
+`post {}` корисний, коли треба виконати код після layout pass, але ним не варто маскувати проблеми архітектури.
 
-17. **Типові методи custom View**
+11. **Практичне правило**
 
-Найважливіші:
-
-```text
-onMeasure()
-onLayout()
-onDraw()
-onTouchEvent()
-performClick()
-invalidate()
-requestLayout()
-onAttachedToWindow()
-onDetachedFromWindow()
-onSaveInstanceState()
-onRestoreInstanceState()
-```
-
-18. **Практичне правило**
-
-- Змінився тільки вигляд — `invalidate()`.
-- Змінився розмір/layout — `requestLayout()`.
+- Розмір View — `onMeasure()`.
+- Розміщення child views — `onLayout()`.
 - Малювання — `onDraw()`.
-- Розмір — `onMeasure()`.
-- Розміщення дітей — `onLayout()`.
-- Touch — `onTouchEvent()` + `performClick()`.
+- Перемалювання — `invalidate()`.
+- Повний layout pass — `requestLayout()`.
+- Touch/click — `onTouchEvent()` + `performClick()`.
 - Cleanup — `onDetachedFromWindow()`.
-- Не робити важку роботу в UI callbacks.
+- Accessibility — `contentDescription`, focus, click actions.
 
-**Коротко:** у `View` ключові методи повʼязані з measure/layout/draw pipeline, input events, state, visibility, focus і lifecycle attachment. Для custom View найважливіші `onMeasure`, `onDraw`, `invalidate`, `requestLayout`, `onTouchEvent` і `performClick`.
+**Коротко:** ключові методи `View` відповідають за lifecycle, measure/layout/draw pipeline, input events, state, visibility, focus і accessibility. Для custom View найважливіші `onMeasure`, `onDraw`, `invalidate`, `requestLayout`, `onTouchEvent` і `performClick`.
 
 </details>
 <details>
@@ -40066,23 +39050,23 @@ DataStore — для small settings, не для app database.
 
 #### Kotlin
 
-`Paging 3` — це Jetpack-бібліотека для поступового завантаження і відображення великих списків даних. Вона дозволяє не тримати весь список у памʼяті, а завантажувати сторінки за потреби: з network, database або комбінації network + Room. Paging 3 добре інтегрується з Kotlin Coroutines, Flow, RecyclerView і Jetpack Compose.
+`Paging 3` — це Jetpack-бібліотека для поступового завантаження великих списків даних. Вона дозволяє не вантажити весь dataset одразу, а підвантажувати сторінки з network, Room або комбінації network + database. Paging 3 добре інтегрується з Coroutines, Flow, RecyclerView і Compose.
 
 1. **Навіщо потрібен Paging**
 
-Якщо є 10 000 елементів, погано завантажувати все одразу:
+Погано:
 
 ```kotlin
 val users = api.getAllUsers()
 ```
 
-Проблеми:
+Якщо елементів тисячі, це дає:
 
-- довге очікування;
-- зайва памʼять;
+- довгий initial loading;
+- зайву памʼять;
 - велике network навантаження;
-- складне оновлення;
-- поганий UX.
+- поганий UX;
+- складний retry/refresh.
 
 Paging завантажує дані частинами:
 
@@ -40090,22 +39074,15 @@ Paging завантажує дані частинами:
 page 1 -> page 2 -> page 3 -> ...
 ```
 
-2. **Основні компоненти Paging 3**
-
-Ключові частини:
+2. **Основні компоненти**
 
 ```text
-PagingSource
-Pager
-PagingData
-PagingDataAdapter / LazyPagingItems
-RemoteMediator
+PagingSource       -> завантажує одну сторінку
+Pager              -> створює Flow<PagingData<T>>
+PagingData         -> контейнер paged data
+PagingDataAdapter  -> adapter для RecyclerView
+RemoteMediator     -> sync network + database
 ```
-
-`PagingSource` знає, як завантажити одну сторінку.  
-`Pager` створює `Flow<PagingData<T>>`.  
-`PagingDataAdapter` показує дані в RecyclerView.  
-`RemoteMediator` синхронізує network + database.
 
 3. **PagingSource**
 
@@ -40134,19 +39111,17 @@ class UserPagingSource(
     }
 
     override fun getRefreshKey(state: PagingState<Int, User>): Int? {
-        return state.anchorPosition?.let { anchorPosition ->
-            val anchorPage = state.closestPageToPosition(anchorPosition)
-            anchorPage?.prevKey?.plus(1) ?: anchorPage?.nextKey?.minus(1)
+        return state.anchorPosition?.let { position ->
+            val page = state.closestPageToPosition(position)
+            page?.prevKey?.plus(1) ?: page?.nextKey?.minus(1)
         }
     }
 }
 ```
 
-`load()` повертає або сторінку, або помилку.
+`load()` повертає сторінку або помилку.
 
-4. **Pager**
-
-Repository створює `Pager`:
+4. **Pager у Repository**
 
 ```kotlin
 class UserRepository(
@@ -40158,9 +39133,7 @@ class UserRepository(
                 pageSize = 20,
                 enablePlaceholders = false
             ),
-            pagingSourceFactory = {
-                UserPagingSource(api)
-            }
+            pagingSourceFactory = { UserPagingSource(api) }
         ).flow
     }
 }
@@ -40181,50 +39154,25 @@ class UserListViewModel(
 }
 ```
 
-`cachedIn(viewModelScope)` кешує paging stream у ViewModel scope, щоб не перезавантажувати дані при configuration changes.
+`cachedIn(viewModelScope)` важливий, щоб paging stream переживав configuration changes і не перезапускався без потреби.
 
-6. **RecyclerView adapter**
+6. **RecyclerView**
 
 ```kotlin
-class UserAdapter : PagingDataAdapter<User, UserViewHolder>(UserDiffCallback) {
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): UserViewHolder {
-        return UserViewHolder(
-            ItemUserBinding.inflate(
-                LayoutInflater.from(parent.context),
-                parent,
-                false
-            )
-        )
-    }
+class UserPagingAdapter :
+    PagingDataAdapter<User, UserViewHolder>(UserDiffCallback) {
 
     override fun onBindViewHolder(holder: UserViewHolder, position: Int) {
-        val user = getItem(position)
-        if (user != null) {
-            holder.bind(user)
-        }
+        getItem(position)?.let(holder::bind)
     }
 }
 ```
 
-DiffCallback:
-
-```kotlin
-object UserDiffCallback : DiffUtil.ItemCallback<User>() {
-    override fun areItemsTheSame(oldItem: User, newItem: User): Boolean {
-        return oldItem.id == newItem.id
-    }
-
-    override fun areContentsTheSame(oldItem: User, newItem: User): Boolean {
-        return oldItem == newItem
-    }
-}
-```
-
-7. **Підписка у Fragment**
+Підписка:
 
 ```kotlin
 viewLifecycleOwner.lifecycleScope.launch {
-    viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+    repeatOnLifecycle(Lifecycle.State.STARTED) {
         viewModel.users.collectLatest { pagingData ->
             adapter.submitData(pagingData)
         }
@@ -40232,29 +39180,20 @@ viewLifecycleOwner.lifecycleScope.launch {
 }
 ```
 
-`collectLatest` важливий: якщо прийшов новий `PagingData`, старе завантаження скасовується.
+`collectLatest` скасовує старий submit, якщо прийшов новий `PagingData`.
 
-8. **LoadState**
+7. **LoadState**
 
-Paging дає loading/error state:
+Paging дає loading/error/retry states:
 
 ```kotlin
 adapter.addLoadStateListener { loadState ->
     binding.progressBar.isVisible = loadState.refresh is LoadState.Loading
     binding.errorView.isVisible = loadState.refresh is LoadState.Error
-    binding.recyclerView.isVisible = loadState.refresh is LoadState.NotLoading
 }
 ```
 
-Можна обробляти:
-
-```text
-refresh -> перше завантаження або refresh
-append  -> завантаження наступної сторінки
-prepend -> завантаження попередньої сторінки
-```
-
-9. **Retry**
+Retry:
 
 ```kotlin
 binding.retryButton.setOnClickListener {
@@ -40262,9 +39201,7 @@ binding.retryButton.setOnClickListener {
 }
 ```
 
-`retry()` повторює failed load без повного reset, якщо це можливо.
-
-10. **Refresh**
+Refresh:
 
 ```kotlin
 swipeRefreshLayout.setOnRefreshListener {
@@ -40272,11 +39209,9 @@ swipeRefreshLayout.setOnRefreshListener {
 }
 ```
 
-`refresh()` інвалідовує поточний paging source і запускає нове завантаження.
+8. **Room + Paging**
 
-11. **Room + Paging**
-
-Room може повертати `PagingSource`:
+Room може напряму повертати `PagingSource`:
 
 ```kotlin
 @Dao
@@ -40297,23 +39232,19 @@ fun getUsers(): Flow<PagingData<UserEntity>> {
 }
 ```
 
-Це добре для локальних великих списків.
+Це хороший варіант для локальних великих списків.
 
-12. **RemoteMediator**
+9. **RemoteMediator**
 
-`RemoteMediator` використовують, коли джерело правди — database, а network підвантажує дані:
+`RemoteMediator` потрібен для offline-first сценарію:
 
 ```text
-UI -> PagingData from Room
-RemoteMediator -> fetch from API
-API data -> save to Room
+UI reads PagingData from Room
+RemoteMediator fetches API
+API result saves to Room
 Room invalidates PagingSource
-UI updates
+UI updates automatically
 ```
-
-Це правильний offline-first підхід.
-
-Спрощено:
 
 ```kotlin
 Pager(
@@ -40323,19 +39254,18 @@ Pager(
 ).flow
 ```
 
-13. **Compose**
+Це краще, ніж напряму показувати network pages, якщо потрібен cache/offline режим.
 
-У Compose:
+10. **Compose**
 
 ```kotlin
 @Composable
-fun UserListScreen(viewModel: UserListViewModel) {
+fun UserPagingScreen(viewModel: UserListViewModel) {
     val users = viewModel.users.collectAsLazyPagingItems()
 
     LazyColumn {
         items(users.itemCount) { index ->
-            val user = users[index]
-            if (user != null) {
+            users[index]?.let { user ->
                 UserItem(user)
             }
         }
@@ -40343,7 +39273,7 @@ fun UserListScreen(viewModel: UserListViewModel) {
 }
 ```
 
-LoadState:
+LoadState у Compose:
 
 ```kotlin
 when (users.loadState.refresh) {
@@ -40353,27 +39283,27 @@ when (users.loadState.refresh) {
 }
 ```
 
-14. **Типові помилки**
+11. **Типові помилки**
 
 - Не використовувати `cachedIn(viewModelScope)`.
-- Створювати новий `Pager` при кожній recomposition/call без потреби.
+- Створювати новий `Pager` при кожній recomposition/call.
 - Не обробляти `LoadState.Error`.
+- Неправильно рахувати `prevKey`/`nextKey`.
+- Ігнорувати `getRefreshKey()`.
+- Використовувати network-only paging там, де потрібен offline-first cache.
 - Завантажувати все одразу замість paging.
-- Неправильно реалізувати `prevKey`/`nextKey`.
-- Ігнорувати `getRefreshKey`.
-- Змішувати network paging і local cache без `RemoteMediator`, коли потрібен offline-first.
 
-15. **Практичне правило**
+12. **Практичне правило**
 
-- Network-only paging — `PagingSource`.
-- Local database paging — Room `PagingSource`.
-- Network + cache/offline-first — `RemoteMediator`.
-- У ViewModel використовувати `cachedIn(viewModelScope)`.
-- У RecyclerView — `PagingDataAdapter`.
-- У Compose — `collectAsLazyPagingItems`.
-- Завжди обробляти loading/error/retry states.
+- Network-only список — `PagingSource`.
+- Local список — Room `PagingSource`.
+- Network + cache — `RemoteMediator`.
+- ViewModel — `cachedIn(viewModelScope)`.
+- RecyclerView — `PagingDataAdapter`.
+- Compose — `collectAsLazyPagingItems()`.
+- Завжди обробляти loading, error, retry і refresh.
 
-**Коротко:** Paging 3 — це Jetpack-рішення для ефективного завантаження великих списків сторінками. Воно дає `Flow<PagingData<T>>`, інтегрується з Room, network, RecyclerView і Compose, та допомагає правильно обробляти loading, errors, retry і refresh.
+**Коротко:** Paging 3 — це Jetpack-рішення для ефективного завантаження великих списків сторінками. Воно дає `Flow<PagingData<T>>`, працює з Room/network/Compose/RecyclerView і бере на себе loading, retry, refresh та частину lifecycle-логіки списку.
 
 </details>
 <details>
@@ -40381,21 +39311,21 @@ when (users.loadState.refresh) {
 
 #### Kotlin
 
-`RecyclerView.Adapter` — це клас-посередник між даними і `RecyclerView`. Він відповідає за створення item views, привʼязку даних до item views і повідомлення `RecyclerView` про зміни в списку. Adapter не має сам зберігати бізнес-логіку; його задача — ефективно відобразити колекцію елементів через `ViewHolder`.
+`RecyclerView.Adapter` — це міст між списком даних і `RecyclerView`. Він відповідає за створення item UI, привʼязку даних до `ViewHolder` і повідомлення `RecyclerView` про зміни. Adapter не має містити business logic або navigation logic; його задача — ефективно показати колекцію моделей.
 
-1. **Базова роль Adapter**
+1. **Основна роль**
 
 ```text
 Data list -> Adapter -> ViewHolder -> RecyclerView item UI
 ```
 
-Adapter відповідає на три головні питання:
+Adapter відповідає на три питання:
 
-- скільки елементів у списку;
-- як створити View для item;
-- як заповнити item даними.
+- скільки item-ів у списку;
+- як створити ViewHolder;
+- як заповнити ViewHolder даними.
 
-2. **Простий Adapter**
+2. **Мінімальний Adapter**
 
 ```kotlin
 class UserAdapter(
@@ -40418,20 +39348,14 @@ class UserAdapter(
     }
 
     override fun getItemCount(): Int = items.size
-
-    fun submitItems(newItems: List<User>) {
-        items.clear()
-        items.addAll(newItems)
-        notifyDataSetChanged()
-    }
 }
 ```
 
-Це базовий варіант, але `notifyDataSetChanged()` для production часто не оптимальний.
+Це базова форма, але для production частіше використовують `ListAdapter`.
 
 3. **ViewHolder**
 
-`ViewHolder` тримає references на item views і bind-ить модель:
+`ViewHolder` тримає item view і вміє bind-ити модель:
 
 ```kotlin
 class UserViewHolder(
@@ -40449,34 +39373,17 @@ class UserViewHolder(
 }
 ```
 
-ViewHolder потрібен, щоб не шукати views заново і перевикористовувати item UI.
+ViewHolder потрібен, щоб RecyclerView міг перевикористовувати item views під час scroll.
 
-4. **onCreateViewHolder**
+4. **Recycling**
 
-```kotlin
-override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): UserViewHolder {
-    val binding = ItemUserBinding.inflate(
-        LayoutInflater.from(parent.context),
-        parent,
-        false
-    )
-    return UserViewHolder(binding, onUserClick)
-}
+RecyclerView не створює View для кожного елемента списку. Він тримає тільки видимі item-и і невеликий cache:
+
+```text
+visible ViewHolders + cache -> reuse on scroll
 ```
 
-Цей метод створює новий ViewHolder. Він не викликається для кожного елемента постійно, бо RecyclerView перевикористовує ViewHolder-и.
-
-5. **onBindViewHolder**
-
-```kotlin
-override fun onBindViewHolder(holder: UserViewHolder, position: Int) {
-    holder.bind(items[position])
-}
-```
-
-Цей метод викликається, коли треба показати конкретні дані в конкретному ViewHolder.
-
-Важливо: bind має повністю встановлювати state item view, бо ViewHolder перевикористовується.
+Коли item виходить за межі екрана, його ViewHolder може бути використаний для іншої позиції. Тому `bind()` має повністю виставляти state.
 
 Погано:
 
@@ -40492,29 +39399,9 @@ if (user.isAdmin) {
 binding.badge.isVisible = user.isAdmin
 ```
 
-Інакше старий state може “протекти” в інший item.
+Інакше старий state може “протекти” в новий item.
 
-6. **getItemCount**
-
-```kotlin
-override fun getItemCount(): Int = items.size
-```
-
-RecyclerView використовує це, щоб знати кількість елементів.
-
-7. **Adapter і recycling**
-
-RecyclerView не створює View для кожного елемента списку:
-
-```text
-visible items + small cache -> ViewHolders
-```
-
-Коли item виходить за межі екрана, його ViewHolder може бути перевикористаний для іншого item. Саме тому bind має бути deterministic і не залежати від старого стану View.
-
-8. **ListAdapter**
-
-У production часто використовують `ListAdapter`, бо він має DiffUtil всередині:
+5. **ListAdapter як production default**
 
 ```kotlin
 class UserAdapter(
@@ -40522,12 +39409,7 @@ class UserAdapter(
 ) : ListAdapter<User, UserViewHolder>(UserDiffCallback) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): UserViewHolder {
-        val binding = ItemUserBinding.inflate(
-            LayoutInflater.from(parent.context),
-            parent,
-            false
-        )
-        return UserViewHolder(binding, onUserClick)
+        return UserViewHolder(createBinding(parent), onUserClick)
     }
 
     override fun onBindViewHolder(holder: UserViewHolder, position: Int) {
@@ -40536,7 +39418,7 @@ class UserAdapter(
 }
 ```
 
-DiffCallback:
+Diff:
 
 ```kotlin
 object UserDiffCallback : DiffUtil.ItemCallback<User>() {
@@ -40550,34 +39432,11 @@ object UserDiffCallback : DiffUtil.ItemCallback<User>() {
 }
 ```
 
-9. **notifyDataSetChanged**
+`ListAdapter` краще за ручний `notifyDataSetChanged()`, бо оновлює тільки змінені item-и.
 
-`notifyDataSetChanged()` каже RecyclerView: “усе змінилося”.
+6. **Кілька типів item**
 
-```kotlin
-notifyDataSetChanged()
-```
-
-Мінуси:
-
-- немає точних animations;
-- гірша performance;
-- втрачається granular update;
-- може викликати зайві rebind-и.
-
-Краще використовувати:
-
-```kotlin
-notifyItemInserted(position)
-notifyItemRemoved(position)
-notifyItemChanged(position)
-```
-
-або `DiffUtil`/`ListAdapter`.
-
-10. **Кілька типів item**
-
-Adapter може підтримувати різні view types:
+Для feed/header/loader item-ів використовують `getItemViewType()`:
 
 ```kotlin
 override fun getItemViewType(position: Int): Int {
@@ -40588,105 +39447,62 @@ override fun getItemViewType(position: Int): Int {
 }
 ```
 
-Створення:
+Потім у `onCreateViewHolder` створюється відповідний ViewHolder для конкретного типу.
 
-```kotlin
-override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
-    return when (viewType) {
-        VIEW_TYPE_HEADER -> HeaderViewHolder(...)
-        VIEW_TYPE_POST -> PostViewHolder(...)
-        else -> error("Unknown viewType: $viewType")
-    }
-}
-```
+7. **Click handling**
 
-11. **Click handling**
-
-Краще передавати callback ззовні:
+Adapter краще робити dumb:
 
 ```kotlin
 class UserAdapter(
     private val onUserClick: (User) -> Unit
-) : ListAdapter<User, UserViewHolder>(UserDiffCallback)
+)
 ```
 
-А не робити navigation всередині adapter:
+Погано, коли adapter сам робить navigation:
 
 ```kotlin
-// Погано
 navController.navigate(...)
 ```
 
-Adapter не має знати про navigation або ViewModel, якщо цього можна уникнути.
+Navigation має бути на рівні screen/ViewModel/route callback, а не всередині adapter.
 
-12. **Stable IDs**
+8. **PagingDataAdapter**
 
-Adapter може мати stable ids:
-
-```kotlin
-init {
-    setHasStableIds(true)
-}
-
-override fun getItemId(position: Int): Long {
-    return getItem(position).id.hashCode().toLong()
-}
-```
-
-Це може допомогти RecyclerView краще зберігати item identity, але треба гарантувати стабільність id.
-
-13. **PagingDataAdapter**
-
-Для Paging 3 використовують `PagingDataAdapter`:
+Для Paging 3 використовують окремий adapter:
 
 ```kotlin
 class UserPagingAdapter :
     PagingDataAdapter<User, UserViewHolder>(UserDiffCallback) {
 
     override fun onBindViewHolder(holder: UserViewHolder, position: Int) {
-        val user = getItem(position)
-        if (user != null) {
-            holder.bind(user)
-        }
+        getItem(position)?.let(holder::bind)
     }
 }
 ```
 
-Це adapter, оптимізований для `PagingData`.
+Він працює з `PagingData`, placeholders і load states.
 
-14. **Типові помилки**
+9. **Типові помилки**
 
 - Робити business logic в adapter.
 - Використовувати `notifyDataSetChanged()` для всіх змін.
-- Не скидати state у `bind`.
-- Тримати Activity/Fragment reference в adapter без потреби.
-- Використовувати `position` у click listener без актуальної перевірки.
-- Не використовувати DiffUtil для великих/часто змінних списків.
+- Не скидати state у `bind()`.
+- Тримати `Activity`/`Fragment` reference без потреби.
+- Використовувати застарілий `position` у click listener.
+- Не використовувати DiffUtil для великих або часто змінних списків.
 
-Краще для click:
+10. **Практичне правило**
 
-```kotlin
-binding.root.setOnClickListener {
-    val position = bindingAdapterPosition
-    if (position != RecyclerView.NO_POSITION) {
-        onUserClick(getItem(position))
-    }
-}
-```
-
-Або передавати конкретний item у `bind`, якщо це безпечно для твоєї моделі оновлень.
-
-15. **Практичне правило**
-
-- Adapter — міст між data і RecyclerView UI.
-- ViewHolder — відповідає за item view.
-- `onCreateViewHolder` створює item UI.
-- `onBindViewHolder` заповнює item UI даними.
-- `getItemCount` повертає кількість елементів.
+- Adapter — це glue між даними і item UI.
+- ViewHolder відповідає за конкретний item layout.
+- `onCreateViewHolder` створює item view.
+- `onBindViewHolder` заповнює item даними.
+- `getItemCount` повертає розмір списку.
 - Для production списків краще `ListAdapter`/`DiffUtil`.
-- Adapter не має містити navigation/business logic.
+- Adapter не має знати про domain logic, navigation або DI graph.
 
-**Коротко:** `RecyclerView.Adapter` керує тим, як список даних перетворюється на item views у `RecyclerView`. Він створює `ViewHolder`, bind-ить дані, повідомляє про зміни і дозволяє RecyclerView ефективно перевикористовувати views.
+**Коротко:** `RecyclerView.Adapter` керує тим, як дані перетворюються на item views у `RecyclerView`. Він створює `ViewHolder`, bind-ить дані і дозволяє RecyclerView ефективно перевикористовувати views під час scroll.
 
 </details>
 <details>
@@ -40694,11 +39510,11 @@ binding.root.setOnClickListener {
 
 #### Kotlin
 
-Основні методи `RecyclerView.Adapter` — це `onCreateViewHolder()`, `onBindViewHolder()` і `getItemCount()`. Додатково часто використовують `getItemViewType()`, `getItemId()`, lifecycle callbacks для ViewHolder, а також notify-методи для повідомлення RecyclerView про зміни списку.
+Основні методи `RecyclerView.Adapter` — це `onCreateViewHolder()`, `onBindViewHolder()` і `getItemCount()`. Вони визначають, як створюється item UI, як дані bind-яться до `ViewHolder` і скільки item-ів має список. Додатково часто використовують `getItemViewType()`, `getItemId()`, lifecycle callbacks ViewHolder-а і notify-методи.
 
 1. **onCreateViewHolder**
 
-Створює новий `ViewHolder`:
+Створює новий `ViewHolder` для конкретного `viewType`:
 
 ```kotlin
 override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): UserViewHolder {
@@ -40711,11 +39527,11 @@ override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): UserViewHolde
 }
 ```
 
-Викликається не для кожного item завжди, а коли RecyclerView потрібен новий ViewHolder для певного `viewType`.
+Викликається тоді, коли RecyclerView потрібен новий ViewHolder, а не на кожен bind.
 
 2. **onBindViewHolder**
 
-Привʼязує дані до ViewHolder:
+Привʼязує item data до ViewHolder:
 
 ```kotlin
 override fun onBindViewHolder(holder: UserViewHolder, position: Int) {
@@ -40723,17 +39539,14 @@ override fun onBindViewHolder(holder: UserViewHolder, position: Int) {
 }
 ```
 
-У `bind` треба повністю виставляти стан item view:
+`bind()` має повністю виставляти state item-а, бо ViewHolder перевикористовується:
 
 ```kotlin
 fun bind(user: User) {
     binding.name.text = user.name
-    binding.email.text = user.email
     binding.badge.isVisible = user.isAdmin
 }
 ```
-
-Це важливо через recycling.
 
 3. **getItemCount**
 
@@ -40747,7 +39560,7 @@ RecyclerView використовує це для layout, scroll range і поз
 
 4. **getItemViewType**
 
-Потрібен, якщо список має різні типи item:
+Потрібен для різних типів item-ів:
 
 ```kotlin
 override fun getItemViewType(position: Int): Int {
@@ -40759,22 +39572,11 @@ override fun getItemViewType(position: Int): Int {
 }
 ```
 
-Потім у `onCreateViewHolder`:
-
-```kotlin
-override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
-    return when (viewType) {
-        VIEW_TYPE_HEADER -> HeaderViewHolder(createHeaderBinding(parent))
-        VIEW_TYPE_POST -> PostViewHolder(createPostBinding(parent))
-        VIEW_TYPE_LOADER -> LoaderViewHolder(createLoaderBinding(parent))
-        else -> error("Unknown viewType: $viewType")
-    }
-}
-```
+Після цього `onCreateViewHolder()` створює різні ViewHolder-и залежно від `viewType`.
 
 5. **onBindViewHolder з payloads**
 
-Є overload для partial updates:
+Overload для часткових оновлень:
 
 ```kotlin
 override fun onBindViewHolder(
@@ -40783,18 +39585,18 @@ override fun onBindViewHolder(
     payloads: MutableList<Any>
 ) {
     if (payloads.isEmpty()) {
-        super.onBindViewHolder(holder, position, payloads)
+        holder.bind(items[position])
     } else {
         holder.updatePartial(payloads)
     }
 }
 ```
 
-Це корисно, коли змінилася тільки частина item, наприклад `isSelected`, і не треба повністю rebind-ити весь UI.
+Це корисно, коли змінилася тільки частина item-а, наприклад selected state.
 
 6. **getItemId**
 
-Якщо ввімкнені stable ids:
+Для stable ids:
 
 ```kotlin
 init {
@@ -40806,11 +39608,11 @@ override fun getItemId(position: Int): Long {
 }
 ```
 
-Stable IDs допомагають RecyclerView краще розуміти identity item, але id має бути справді стабільним.
+Stable ids допомагають RecyclerView краще розуміти item identity, але id має бути справді стабільним.
 
 7. **onViewRecycled**
 
-Викликається, коли ViewHolder іде в recycle:
+Викликається перед reuse ViewHolder-а:
 
 ```kotlin
 override fun onViewRecycled(holder: UserViewHolder) {
@@ -40819,15 +39621,7 @@ override fun onViewRecycled(holder: UserViewHolder) {
 }
 ```
 
-Може бути корисно для cleanup:
-
-```kotlin
-fun clear() {
-    binding.imageView.setImageDrawable(null)
-}
-```
-
-Але більшість state краще правильно виставляти в `bind`.
+Корисно для cleanup: скасувати animation, очистити image, прибрати listener, зупинити playback preview.
 
 8. **onViewAttachedToWindow / onViewDetachedFromWindow**
 
@@ -40843,26 +39637,17 @@ override fun onViewDetachedFromWindow(holder: UserViewHolder) {
 }
 ```
 
-Ці callbacks корисні для старту/зупинки item-level animation, video preview або listeners, які мають жити тільки поки item attached.
+Використовується для item-level ресурсів, які мають жити тільки поки item attached.
 
-9. **notifyDataSetChanged**
+9. **notify-методи**
+
+Грубий варіант:
 
 ```kotlin
 notifyDataSetChanged()
 ```
 
-Повідомляє, що весь список змінився. Це найгрубіший спосіб оновлення.
-
-Мінуси:
-
-- немає granular animations;
-- зайві rebind-и;
-- гірша performance;
-- RecyclerView не знає, що саме змінилось.
-
-У production краще використовувати DiffUtil/ListAdapter або точкові notify-методи.
-
-10. **notifyItemInserted / Removed / Changed / Moved**
+Краще точкові оновлення:
 
 ```kotlin
 notifyItemInserted(position)
@@ -40874,16 +39659,16 @@ notifyItemMoved(fromPosition, toPosition)
 Для range:
 
 ```kotlin
-notifyItemRangeInserted(startPosition, itemCount)
-notifyItemRangeRemoved(startPosition, itemCount)
-notifyItemRangeChanged(startPosition, itemCount)
+notifyItemRangeInserted(start, count)
+notifyItemRangeRemoved(start, count)
+notifyItemRangeChanged(start, count)
 ```
 
-Ці методи дозволяють RecyclerView робити коректні animations і мінімізувати rebind.
+У production для звичайних списків краще `ListAdapter`/`DiffUtil`, а не ручні notify-виклики.
 
-11. **ListAdapter submitList**
+10. **ListAdapter submitList**
 
-Якщо використовується `ListAdapter`, вручну notify-методи зазвичай не потрібні:
+Якщо використовується `ListAdapter`, `getItemCount()` і diff updates уже реалізовані:
 
 ```kotlin
 class UserAdapter : ListAdapter<User, UserViewHolder>(UserDiffCallback) {
@@ -40903,82 +39688,25 @@ class UserAdapter : ListAdapter<User, UserViewHolder>(UserDiffCallback) {
 adapter.submitList(users)
 ```
 
-DiffUtil сам порахує різницю.
+11. **Типові помилки**
 
-12. **registerAdapterDataObserver**
+- Використовувати `notifyDataSetChanged()` замість DiffUtil.
+- Не скидати старий state у `bind()`.
+- Використовувати нестабільний `getItemId()`.
+- Неправильно обробляти `viewType`.
+- Робити важку роботу в `onBindViewHolder()`.
+- Зберігати старий `position` у click listener.
 
-Можна слухати зміни adapter-а:
-
-```kotlin
-adapter.registerAdapterDataObserver(
-    object : RecyclerView.AdapterDataObserver() {
-        override fun onItemRangeInserted(positionStart: Int, itemCount: Int) {
-            recyclerView.scrollToPosition(0)
-        }
-    }
-)
-```
-
-Це використовують рідше, але корисно для scroll behavior або empty state.
-
-13. **onAttachedToRecyclerView / onDetachedFromRecyclerView**
-
-```kotlin
-override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
-    super.onAttachedToRecyclerView(recyclerView)
-}
-
-override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
-    super.onDetachedFromRecyclerView(recyclerView)
-}
-```
-
-Можна використовувати для setup/cleanup, коли adapter підключається або відключається від RecyclerView.
-
-14. **Типовий мінімальний Adapter**
-
-```kotlin
-class UserAdapter(
-    private val onClick: (User) -> Unit
-) : ListAdapter<User, UserViewHolder>(UserDiffCallback) {
-
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): UserViewHolder {
-        val binding = ItemUserBinding.inflate(
-            LayoutInflater.from(parent.context),
-            parent,
-            false
-        )
-        return UserViewHolder(binding, onClick)
-    }
-
-    override fun onBindViewHolder(holder: UserViewHolder, position: Int) {
-        holder.bind(getItem(position))
-    }
-}
-```
-
-У `ListAdapter` не треба override-ити `getItemCount()`, бо він уже працює з current list.
-
-15. **Типові помилки**
-
-- Неправильно використовувати `position` у click listener.
-- Не скидати старий state у `bind`.
-- Викликати `notifyDataSetChanged()` замість DiffUtil.
-- Повертати нестабільний `getItemId`.
-- Не обробляти різні `viewType`.
-- Робити важку роботу в `onBindViewHolder`.
-- Тримати reference на Activity/Fragment без потреби.
-
-16. **Практичне правило**
+12. **Практичне правило**
 
 - Обовʼязкові методи: `onCreateViewHolder`, `onBindViewHolder`, `getItemCount`.
-- Для різних item — `getItemViewType`.
+- Для різних item layouts — `getItemViewType`.
 - Для stable identity — `getItemId` + `setHasStableIds(true)`.
 - Для cleanup — `onViewRecycled`.
 - Для attach/detach ресурсів — `onViewAttachedToWindow`/`onViewDetachedFromWindow`.
-- Для оновлень — DiffUtil/ListAdapter або точкові notify-методи.
+- Для оновлень — `ListAdapter`/`DiffUtil` або точкові notify-методи.
 
-**Коротко:** головні методи `RecyclerView.Adapter` створюють ViewHolder, bind-ять дані й повертають кількість item. Додаткові методи керують типами item, stable ids, recycling lifecycle і точковими оновленнями списку.
+**Коротко:** основні методи `RecyclerView.Adapter` створюють ViewHolder, bind-ять дані й повертають кількість item-ів. Додаткові методи керують типами item-ів, stable ids, recycling lifecycle і точковими оновленнями списку.
 
 </details>
 <details>
@@ -41242,11 +39970,9 @@ notifyItemRemoved(position)
 
 #### Kotlin
 
-`RecyclerView` працює як оптимізований контейнер для списків: він не створює View для всіх елементів, а тримає тільки видимі item views і невеликий cache, перевикористовуючи `ViewHolder`-и під час scroll. Його робота побудована навколо `Adapter`, `ViewHolder`, `LayoutManager`, `Recycler`, `ItemAnimator`, `ItemDecoration` і diff/update механізмів.
+`RecyclerView` працює як оптимізований контейнер для великих списків: він не створює View для всіх елементів, а тримає тільки видимі item views і невеликий cache. Під час скролу `ViewHolder`-и перевикористовуються, а `Adapter` заново bind-ить їх до інших позицій.
 
 1. **Головна ідея recycling**
-
-Якщо список має 10 000 елементів, RecyclerView не створює 10 000 View:
 
 ```text
 10 000 data items
@@ -41254,7 +39980,7 @@ notifyItemRemoved(position)
 small cache/recycled pool
 ```
 
-Коли item виходить за межі екрана, його ViewHolder може бути використаний для нового item.
+RecyclerView створює обмежену кількість `ViewHolder`-ів і перевикористовує їх замість створення нового View для кожного item-а.
 
 2. **Основні учасники**
 
@@ -41263,110 +39989,44 @@ RecyclerView
  ├── Adapter
  ├── ViewHolder
  ├── LayoutManager
- ├── Recycler
- ├── RecycledViewPool
+ ├── Recycler / RecycledViewPool
  ├── ItemAnimator
  └── ItemDecoration
 ```
 
-`Adapter` дає дані і створює ViewHolder.  
-`LayoutManager` вирішує, де розмістити items.  
-`Recycler` керує cache/reuse.  
-`ItemAnimator` анімує зміни.  
-`ItemDecoration` малює separators/offsets.
+- `Adapter` створює і bind-ить item UI.
+- `ViewHolder` тримає item view.
+- `LayoutManager` розміщує items.
+- `Recycler` керує reuse/cache.
+- `ItemAnimator` анімує зміни.
+- `ItemDecoration` додає spacing/dividers/custom drawing.
 
-3. **Adapter**
-
-Adapter відповідає за створення і bind item:
-
-```kotlin
-override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): UserViewHolder {
-    return UserViewHolder(createBinding(parent))
-}
-
-override fun onBindViewHolder(holder: UserViewHolder, position: Int) {
-    holder.bind(items[position])
-}
-
-override fun getItemCount(): Int = items.size
-```
-
-RecyclerView викликає ці методи тоді, коли йому потрібен ViewHolder або коли треба привʼязати нову позицію.
-
-4. **ViewHolder**
-
-ViewHolder — wrapper навколо item View:
-
-```kotlin
-class UserViewHolder(
-    private val binding: ItemUserBinding
-) : RecyclerView.ViewHolder(binding.root) {
-
-    fun bind(user: User) {
-        binding.name.text = user.name
-        binding.avatar.load(user.avatarUrl)
-    }
-}
-```
-
-Він зменшує кількість створень View і повторних пошуків View всередині item layout.
-
-5. **LayoutManager**
-
-`LayoutManager` відповідає за measure/layout items:
-
-```kotlin
-recyclerView.layoutManager = LinearLayoutManager(context)
-```
-
-Типи:
-
-```kotlin
-LinearLayoutManager(context)
-GridLayoutManager(context, spanCount = 2)
-StaggeredGridLayoutManager(2, RecyclerView.VERTICAL)
-```
-
-RecyclerView сам не знає, як розкладати item-и. Це задача LayoutManager.
-
-6. **Що відбувається при першому layout**
+3. **Перший layout**
 
 Спрощено:
 
 ```text
 RecyclerView measure/layout
- -> LayoutManager asks Recycler for views for positions
- -> Recycler asks Adapter to create/bind ViewHolder if needed
+ -> LayoutManager asks Recycler for views
+ -> Recycler asks Adapter for ViewHolder if needed
+ -> Adapter creates/binds ViewHolder
  -> LayoutManager positions child views
  -> RecyclerView draws children
 ```
 
-Якщо ViewHolder ще немає:
+Якщо ViewHolder ще немає — викликається `onCreateViewHolder()` і `onBindViewHolder()`. Якщо ViewHolder можна reuse-ити — тільки `onBindViewHolder()`.
+
+4. **Що відбувається при scroll**
 
 ```text
-Adapter.onCreateViewHolder()
-Adapter.onBindViewHolder()
+item leaves screen
+ -> ViewHolder goes to cache/pool
+new item enters screen
+ -> old ViewHolder reused
+ -> Adapter binds new data
 ```
 
-Якщо ViewHolder можна перевикористати:
-
-```text
-Adapter.onBindViewHolder()
-```
-
-7. **Що відбувається при scroll**
-
-Коли користувач scroll-ить:
-
-```text
-top item leaves screen
- -> ViewHolder goes to scrap/cache/pool
-new bottom item needed
- -> Recycler reuses old ViewHolder
- -> Adapter binds it to new position
-```
-
-Тому `bind` має повністю виставляти UI state:
+Тому `bind()` має повністю виставляти state:
 
 ```kotlin
 binding.title.text = item.title
@@ -41374,23 +40034,26 @@ binding.badge.isVisible = item.isImportant
 binding.checkbox.isChecked = item.isSelected
 ```
 
-Якщо не скидати state, старий item state може зʼявитися в новому item.
+Не можна покладатися на старий стан View, бо ViewHolder міг належати іншому item-у.
 
-8. **Scrap, cache і pool**
+5. **LayoutManager**
 
-RecyclerView має кілька рівнів reuse:
+RecyclerView сам не знає, як розкладати item-и. Це робить `LayoutManager`:
 
-```text
-attached scrap  -> тимчасово відʼєднані views під час layout
-view cache      -> recent detached views
-recycled pool   -> ViewHolders для reuse за viewType
+```kotlin
+recyclerView.layoutManager = LinearLayoutManager(context)
 ```
 
-Це дозволяє мінімізувати створення нових ViewHolder.
+Інші варіанти:
 
-9. **ViewType**
+```kotlin
+GridLayoutManager(context, spanCount = 2)
+StaggeredGridLayoutManager(2, RecyclerView.VERTICAL)
+```
 
-Для різних item layout:
+6. **View types**
+
+Для різних item layouts:
 
 ```kotlin
 override fun getItemViewType(position: Int): Int {
@@ -41401,11 +40064,23 @@ override fun getItemViewType(position: Int): Int {
 }
 ```
 
-RecyclerView не буде перевикористовувати Header ViewHolder як Post ViewHolder, бо viewType різний.
+RecyclerView не буде reuse-ити `HeaderViewHolder` як `PostViewHolder`, бо `viewType` різний.
 
-10. **notify і update pipeline**
+7. **Cache і RecycledViewPool**
 
-Коли дані змінились, adapter повідомляє RecyclerView:
+У RecyclerView є кілька рівнів reuse:
+
+```text
+attached scrap -> тимчасові views під час layout
+view cache     -> recent detached views
+recycled pool  -> ViewHolders за viewType
+```
+
+Це зменшує allocations і робить scroll дешевшим.
+
+8. **Оновлення списку**
+
+Adapter повідомляє RecyclerView про зміни:
 
 ```kotlin
 notifyItemInserted(position)
@@ -41413,58 +40088,22 @@ notifyItemRemoved(position)
 notifyItemChanged(position)
 ```
 
-RecyclerView:
+Краще використовувати `DiffUtil`/`ListAdapter`, щоб RecyclerView отримував точні зміни: insert, remove, move, change. `notifyDataSetChanged()` змушує вважати, що змінився весь список.
 
-- оновлює internal positions;
-- запускає layout pass;
-- rebind-ить потрібні items;
-- запускає item animations, якщо можливо.
-
-`notifyDataSetChanged()` змушує вважати, що все змінилось, тому він менш ефективний.
-
-11. **DiffUtil**
-
-`DiffUtil` рахує різницю між старим і новим списком:
-
-```kotlin
-object UserDiffCallback : DiffUtil.ItemCallback<User>() {
-    override fun areItemsTheSame(oldItem: User, newItem: User): Boolean {
-        return oldItem.id == newItem.id
-    }
-
-    override fun areContentsTheSame(oldItem: User, newItem: User): Boolean {
-        return oldItem == newItem
-    }
-}
-```
-
-`ListAdapter` використовує це автоматично через `submitList`.
-
-12. **ItemAnimator**
-
-`ItemAnimator` відповідає за animations:
+9. **ItemAnimator**
 
 ```kotlin
 recyclerView.itemAnimator = DefaultItemAnimator()
 ```
 
-Він анімує:
-
-- add;
-- remove;
-- move;
-- change.
-
-Іноді change animations вимикають, якщо вони спричиняють flicker:
+Анімує додавання, видалення, переміщення і зміну item-ів. Якщо change animations дають flicker:
 
 ```kotlin
 (recyclerView.itemAnimator as? SimpleItemAnimator)
     ?.supportsChangeAnimations = false
 ```
 
-13. **ItemDecoration**
-
-`ItemDecoration` додає drawing або offsets:
+10. **ItemDecoration**
 
 ```kotlin
 recyclerView.addItemDecoration(
@@ -41472,22 +40111,11 @@ recyclerView.addItemDecoration(
 )
 ```
 
-Його використовують для separators, spacing, sticky headers, custom drawing.
+Використовується для dividers, spacing, sticky headers або custom drawing без зміни item layout.
 
-14. **Prefetch**
+11. **Чому onBindViewHolder має бути легким**
 
-RecyclerView може prefetch-ити items для плавнішого scroll, особливо з nested RecyclerView або `LinearLayoutManager`:
-
-```text
-predict next needed positions
-prepare/bind before they become visible
-```
-
-Це зменшує jank, але heavy bind все одно буде проблемою.
-
-15. **Чому bind має бути легким**
-
-`onBindViewHolder` викликається під час scroll. Якщо там важка робота:
+Погано:
 
 ```kotlin
 override fun onBindViewHolder(holder: UserViewHolder, position: Int) {
@@ -41496,21 +40124,11 @@ override fun onBindViewHolder(holder: UserViewHolder, position: Int) {
 }
 ```
 
-будуть frame drops.
+Це може лагати під час scroll. Краще передати модель, а картинки вантажити через image loader із cache/cancellation.
 
-Краще:
+12. **Position pitfalls**
 
-```kotlin
-holder.bind(items[position])
-```
-
-А картинки завантажувати через image loading library з caching/cancellation.
-
-16. **State і position**
-
-Позиція item може змінюватися через insert/remove/move. У click listener не треба сліпо кешувати `position`.
-
-Краще:
+Position може змінюватися через insert/remove/move. У click listener краще перевіряти актуальну позицію:
 
 ```kotlin
 binding.root.setOnClickListener {
@@ -41521,20 +40139,20 @@ binding.root.setOnClickListener {
 }
 ```
 
-Або передавати конкретну модель у `bind`, якщо adapter працює immutable snapshots.
+Або передавати конкретний item у `bind()`, якщо adapter працює з immutable snapshots.
 
-17. **Практичне правило**
+13. **Практичне правило**
 
 - RecyclerView створює тільки потрібні ViewHolder-и.
 - ViewHolder-и перевикористовуються при scroll.
 - Adapter створює і bind-ить item UI.
-- LayoutManager розміщує items.
+- LayoutManager відповідає за розміщення.
 - DiffUtil/ListAdapter дає точкові оновлення.
-- Bind має бути швидким і повністю встановлювати state.
-- Для різних layout використовувати `viewType`.
-- Для великих списків не використовувати ручний `LinearLayout.addView`.
+- `bind()` має бути швидким і повністю встановлювати state.
+- Для різних item layouts використовувати `viewType`.
+- Для великих списків не використовувати ручний `LinearLayout.addView()`.
 
-**Коротко:** RecyclerView під капотом працює через recycling ViewHolder-ів, layout delegation у LayoutManager і точкові adapter updates. Саме reuse item views, diff updates і cache/pool механізми роблять його ефективним для великих списків.
+**Коротко:** RecyclerView під капотом працює через reuse `ViewHolder`-ів, layout delegation у `LayoutManager`, cache/pool механізми і точкові adapter updates. Саме recycling і DiffUtil/ListAdapter роблять його ефективним для великих списків.
 
 </details>
 <details>
@@ -41821,11 +40439,11 @@ class UserPagingAdapter :
 
 #### Kotlin
 
-Списки в Android можна відображати через `RecyclerView` у View/XML підході або через lazy-контейнери в Jetpack Compose: `LazyColumn`, `LazyRow`, `LazyVerticalGrid`. Для великих або пагінованих списків використовують Paging 3. Вибір залежить від UI stack, обсягу даних, потреби в recycling/paging і складності item-ів.
+Списки в Android відображають через `RecyclerView` у XML/View-системі або через lazy-контейнери в Jetpack Compose: `LazyColumn`, `LazyRow`, `LazyVerticalGrid`. Для великих або paged списків використовують Paging 3. Вибір залежить від UI stack, обсягу даних і вимог до loading/error/empty states.
 
 1. **RecyclerView у View/XML**
 
-Класичний спосіб для XML/View:
+XML:
 
 ```xml
 <androidx.recyclerview.widget.RecyclerView
@@ -41834,7 +40452,7 @@ class UserPagingAdapter :
     android:layout_height="match_parent" />
 ```
 
-У Fragment:
+Fragment:
 
 ```kotlin
 val adapter = UserAdapter(
@@ -41845,54 +40463,15 @@ binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
 binding.recyclerView.adapter = adapter
 ```
 
-Оновлення:
+Оновлення списку:
 
 ```kotlin
 adapter.submitList(users)
 ```
 
-2. **ListAdapter для RecyclerView**
+Для звичайних списків краще `ListAdapter` + `DiffUtil`, а не ручний `notifyDataSetChanged()`.
 
-Для звичайних списків краще використовувати `ListAdapter`:
-
-```kotlin
-class UserAdapter(
-    private val onUserClick: (User) -> Unit
-) : ListAdapter<User, UserViewHolder>(UserDiffCallback) {
-
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): UserViewHolder {
-        return UserViewHolder(createBinding(parent), onUserClick)
-    }
-
-    override fun onBindViewHolder(holder: UserViewHolder, position: Int) {
-        holder.bind(getItem(position))
-    }
-}
-```
-
-`ListAdapter` автоматично рахує різницю між старим і новим списком через DiffUtil.
-
-3. **ViewHolder**
-
-```kotlin
-class UserViewHolder(
-    private val binding: ItemUserBinding,
-    private val onUserClick: (User) -> Unit
-) : RecyclerView.ViewHolder(binding.root) {
-
-    fun bind(user: User) {
-        binding.name.text = user.name
-        binding.email.text = user.email
-        binding.root.setOnClickListener {
-            onUserClick(user)
-        }
-    }
-}
-```
-
-`bind` має повністю виставляти стан item view, бо ViewHolder перевикористовується.
-
-4. **Linear, Grid, Staggered layouts**
+2. **Основні layout-и RecyclerView**
 
 Вертикальний список:
 
@@ -41916,18 +40495,9 @@ Grid:
 recyclerView.layoutManager = GridLayoutManager(context, 2)
 ```
 
-Staggered grid:
+3. **Paging 3 для великих списків**
 
-```kotlin
-recyclerView.layoutManager = StaggeredGridLayoutManager(
-    2,
-    RecyclerView.VERTICAL
-)
-```
-
-5. **Paging 3 для великих списків**
-
-Якщо список великий або приходить з API сторінками:
+Якщо дані приходять сторінками або їх дуже багато:
 
 ```kotlin
 class UserPagingAdapter :
@@ -41959,28 +40529,22 @@ viewLifecycleOwner.lifecycleScope.launch {
 }
 ```
 
-6. **Load states**
-
-Для loading/error:
+4. **Load/Error/Retry states**
 
 ```kotlin
 adapter.addLoadStateListener { loadState ->
     binding.progressBar.isVisible = loadState.refresh is LoadState.Loading
     binding.errorView.isVisible = loadState.refresh is LoadState.Error
 }
-```
 
-Retry:
-
-```kotlin
 binding.retryButton.setOnClickListener {
     adapter.retry()
 }
 ```
 
-7. **Compose LazyColumn**
+Список без loading/error/empty state — неповний production UI.
 
-У Jetpack Compose для вертикального списку:
+5. **Compose LazyColumn**
 
 ```kotlin
 @Composable
@@ -42002,41 +40566,33 @@ fun UserListScreen(
 }
 ```
 
-`LazyColumn` створює тільки видимі composable items, схоже по ідеї на RecyclerView recycling, але працює в Compose runtime.
+`key` важливий для стабільної identity item-а при insert/delete/sort/filter.
 
-8. **Compose LazyRow**
+6. **Compose LazyRow і Grid**
 
 Горизонтальний список:
 
 ```kotlin
 LazyRow {
-    items(
-        items = categories,
-        key = { category -> category.id }
-    ) { category ->
+    items(categories, key = { it.id }) { category ->
         CategoryChip(category)
     }
 }
 ```
 
-9. **Compose Grid**
+Grid:
 
 ```kotlin
 LazyVerticalGrid(
     columns = GridCells.Fixed(2)
 ) {
-    items(
-        items = products,
-        key = { product -> product.id }
-    ) { product ->
+    items(products, key = { it.id }) { product ->
         ProductCard(product)
     }
 }
 ```
 
-Grid використовують для catalog/gallery UI.
-
-10. **Paging у Compose**
+7. **Paging у Compose**
 
 ```kotlin
 @Composable
@@ -42045,8 +40601,7 @@ fun UserPagingScreen(viewModel: UserViewModel) {
 
     LazyColumn {
         items(users.itemCount) { index ->
-            val user = users[index]
-            if (user != null) {
+            users[index]?.let { user ->
                 UserItem(user)
             }
         }
@@ -42064,9 +40619,9 @@ when (users.loadState.refresh) {
 }
 ```
 
-11. **Empty state**
+8. **Empty state**
 
-XML/View:
+View/XML:
 
 ```kotlin
 binding.emptyView.isVisible = users.isEmpty()
@@ -42087,41 +40642,9 @@ if (users.isEmpty()) {
 }
 ```
 
-12. **Click handling**
+9. **Що не робити**
 
-У списку краще передавати callback:
-
-```kotlin
-UserAdapter(
-    onUserClick = { user ->
-        viewModel.onUserClicked(user.id)
-    }
-)
-```
-
-Adapter/item не має самостійно знати про navigation, якщо це можна уникнути.
-
-13. **Performance rules**
-
-Для RecyclerView:
-
-- використовувати `ListAdapter`/`DiffUtil`;
-- не робити heavy work у `onBindViewHolder`;
-- не використовувати `notifyDataSetChanged()` без потреби;
-- правильно скидати item state;
-- для великих списків використовувати Paging.
-
-Для Compose:
-
-- задавати stable `key`;
-- не створювати важкі обʼєкти в item без `remember`;
-- уникати зайвої recomposition;
-- використовувати immutable state;
-- для великих списків використовувати lazy containers.
-
-14. **Що не треба робити**
-
-Погано для великих списків у View:
+Погано у View-системі:
 
 ```kotlin
 items.forEach { item ->
@@ -42129,9 +40652,7 @@ items.forEach { item ->
 }
 ```
 
-Це створює всі View одразу і погано масштабується.
-
-Погано в Compose:
+Погано в Compose для великих списків:
 
 ```kotlin
 Column {
@@ -42141,27 +40662,19 @@ Column {
 }
 ```
 
-Для великих списків треба:
+Для великих списків потрібні `RecyclerView` або lazy-контейнери.
 
-```kotlin
-LazyColumn {
-    items(users) { user ->
-        UserItem(user)
-    }
-}
-```
-
-15. **Практичне правило**
+10. **Практичне правило**
 
 - XML/View список — `RecyclerView`.
 - Простий RecyclerView список — `ListAdapter`.
 - Великий/paged список — Paging 3.
-- Compose список — `LazyColumn`/`LazyRow`.
+- Compose список — `LazyColumn` або `LazyRow`.
 - Compose grid — `LazyVerticalGrid`.
-- Для item identity задавати stable ids/keys.
-- Loading, error, empty states мають бути частиною UI state.
+- Для dynamic lists задавати stable `key`.
+- Loading, error, empty і retry states мають бути частиною UI.
 
-**Коротко:** у View-системі списки відображають через `RecyclerView` з Adapter/ListAdapter/PagingDataAdapter. У Compose — через `LazyColumn`, `LazyRow` або lazy grids. Для великих даних і API-сторінок використовують Paging 3.
+**Коротко:** у View-системі списки відображають через `RecyclerView` з `Adapter`/`ListAdapter`/`PagingDataAdapter`. У Compose — через `LazyColumn`, `LazyRow` або lazy grids. Для великих або remote списків використовують Paging 3.
 
 </details>
 <details>
@@ -42792,317 +41305,151 @@ LazyRow {
 
 #### Kotlin
 
-Анімації в Android — це механізми зміни UI у часі: position, size, alpha, color, scale, rotation, visibility, layout state або composable state. Вони потрібні не тільки для “красоти”, а для пояснення зміни стану, навігації, feedback на дію користувача і покращення perceived performance.
+Анімації в Android — це механізми зміни UI з часом: позиції, прозорості, масштабу, кольору, розміру або стану компонента. Їх використовують, щоб зробити інтерфейс зрозумілішим, а не просто “красивішим”.
 
 1. **Основні типи анімацій**
 
-У Android є кілька підходів:
+В Android найчастіше використовують:
 
-```text
-View Animation
-Property Animation
-Drawable Animation
-Transitions / MotionLayout
-RecyclerView ItemAnimator
-Compose animations
-Window / Activity transitions
-```
-
-У сучасному коді найчастіше використовують property animations, MotionLayout, RecyclerView animations і Compose animation APIs.
+- `ViewPropertyAnimator` — прості анімації View;
+- `ObjectAnimator` / `ValueAnimator` — property/value animations;
+- `AnimatorSet` — комбінація кількох анімацій;
+- `MotionLayout` — складні transition між layout states;
+- Compose animations — `animate*AsState`, `AnimatedVisibility`, `updateTransition`;
+- `RecyclerView.ItemAnimator` — анімації змін у списку.
 
 2. **ViewPropertyAnimator**
 
 Найпростіший спосіб анімувати View:
 
 ```kotlin
-binding.card.animate()
-    .alpha(1f)
-    .translationY(0f)
-    .setDuration(250)
+view.animate()
+    .alpha(0f)
+    .translationY(100f)
+    .setDuration(300)
     .start()
 ```
 
-Наприклад, показати елемент:
-
-```kotlin
-binding.card.alpha = 0f
-binding.card.translationY = 40f
-
-binding.card.animate()
-    .alpha(1f)
-    .translationY(0f)
-    .setDuration(250)
-    .start()
-```
-
-Це зручно для простих View-анімацій.
+Підходить для простих змін: `alpha`, `translationX/Y`, `scaleX/Y`, `rotation`.
 
 3. **ObjectAnimator**
 
-`ObjectAnimator` анімує property обʼєкта:
+`ObjectAnimator` змінює конкретну property обʼєкта:
 
 ```kotlin
-ObjectAnimator.ofFloat(binding.icon, View.ROTATION, 0f, 180f)
-    .apply {
-        duration = 300
-        interpolator = FastOutSlowInInterpolator()
-        start()
-    }
-```
-
-Можна анімувати `alpha`, `translationX`, `translationY`, `scaleX`, `scaleY`, `rotation` та інші properties.
-
-4. **AnimatorSet**
-
-Для комбінації анімацій:
-
-```kotlin
-val fade = ObjectAnimator.ofFloat(binding.card, View.ALPHA, 0f, 1f)
-val move = ObjectAnimator.ofFloat(binding.card, View.TRANSLATION_Y, 40f, 0f)
-
-AnimatorSet().apply {
-    playTogether(fade, move)
-    duration = 250
-    interpolator = FastOutSlowInInterpolator()
+ObjectAnimator.ofFloat(view, View.ALPHA, 1f, 0f).apply {
+    duration = 300
     start()
 }
 ```
 
-`playTogether` запускає одночасно.  
-`playSequentially` запускає послідовно.
+Корисний, коли треба більше контролю або працювати з `AnimatorSet`.
 
-5. **ValueAnimator**
+4. **ValueAnimator**
 
-`ValueAnimator` генерує значення, а ти сам застосовуєш його до UI:
+`ValueAnimator` генерує значення, а ти сам вирішуєш, як його застосувати:
 
 ```kotlin
 ValueAnimator.ofInt(0, 100).apply {
     duration = 300
     addUpdateListener { animator ->
         val value = animator.animatedValue as Int
-        binding.progressBar.progress = value
+        view.translationX = value.toFloat()
     }
     start()
 }
 ```
 
-Корисно для custom View або нестандартних properties.
+Підходить для custom View, кольорів, progress або нестандартної логіки.
 
-6. **Interpolators**
-
-Interpolator визначає, як змінюється значення у часі:
+5. **AnimatorSet**
 
 ```kotlin
-animation.interpolator = FastOutSlowInInterpolator()
-```
+val fade = ObjectAnimator.ofFloat(view, View.ALPHA, 0f, 1f)
+val move = ObjectAnimator.ofFloat(view, View.TRANSLATION_Y, 100f, 0f)
 
-Приклади:
-
-- linear;
-- accelerate;
-- decelerate;
-- fast out slow in;
-- overshoot;
-- bounce.
-
-Правильний interpolator часто важливіший за довгу duration.
-
-7. **Transitions**
-
-Transition API анімує зміни між layout states:
-
-```kotlin
-TransitionManager.beginDelayedTransition(binding.root)
-binding.details.isVisible = true
-```
-
-Android порівнює старий і новий стан View hierarchy та анімує зміни.
-
-Це зручно для простих layout transitions, але для складних сценаріїв краще MotionLayout.
-
-8. **MotionLayout**
-
-`MotionLayout` дозволяє описувати складні анімації між constraint states:
-
-```xml
-<androidx.constraintlayout.motion.widget.MotionLayout
-    android:id="@+id/motionLayout"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    app:layoutDescription="@xml/profile_scene" />
-```
-
-Використовується для:
-
-- collapsing header;
-- onboarding animations;
-- coordinated screen transitions;
-- gesture-driven animations.
-
-MotionLayout сильний, коли анімація залежить від scroll/gesture progress.
-
-9. **RecyclerView animations**
-
-RecyclerView має item animations:
-
-```kotlin
-recyclerView.itemAnimator = DefaultItemAnimator()
-```
-
-При `notifyItemInserted`, `notifyItemRemoved`, `DiffUtil` він може анімувати:
-
-- додавання;
-- видалення;
-- переміщення;
-- зміну item.
-
-Якщо change animation дає flicker:
-
-```kotlin
-(recyclerView.itemAnimator as? SimpleItemAnimator)
-    ?.supportsChangeAnimations = false
-```
-
-10. **Drawable animations**
-
-Animated vector drawable:
-
-```xml
-<animated-vector
-    android:drawable="@drawable/ic_animated">
-    ...
-</animated-vector>
-```
-
-У коді:
-
-```kotlin
-val drawable = binding.icon.drawable
-if (drawable is Animatable) {
-    drawable.start()
+AnimatorSet().apply {
+    playTogether(fade, move)
+    duration = 300
+    start()
 }
 ```
 
-Корисно для іконок, loaders, small vector transitions.
+Дозволяє запускати анімації разом або послідовно.
 
-11. **Compose animations**
+6. **MotionLayout**
 
-У Compose анімації будуються навколо state:
+`MotionLayout` використовують для складних transitions між станами layout. Наприклад: collapsible header, onboarding animation, complex screen transition. Його плюс — декларативний опис start/end states і переходів.
+
+7. **Compose animations**
+
+У Compose анімації привʼязані до state:
 
 ```kotlin
 val alpha by animateFloatAsState(
-    targetValue = if (isVisible) 1f else 0f,
+    targetValue = if (visible) 1f else 0f,
     label = "alpha"
 )
 
 Box(
-    modifier = Modifier.alpha(alpha)
+    Modifier.alpha(alpha)
 )
 ```
 
-Для visibility:
+Для появи/зникнення зручно використовувати:
 
 ```kotlin
-AnimatedVisibility(visible = isVisible) {
+AnimatedVisibility(visible = visible) {
     Text("Content")
 }
 ```
 
-Для content changes:
+Compose-анімація має бути результатом зміни state, а не ручного керування View.
 
-```kotlin
-AnimatedContent(targetState = state) { targetState ->
-    when (targetState) {
-        is UiState.Loading -> LoadingContent()
-        is UiState.Content -> Content(targetState)
-    }
-}
-```
+8. **Interpolators / Easing**
 
-12. **Animatable у Compose**
+Interpolator визначає, як змінюється значення з часом:
 
-Для ручного контролю:
+- linear — рівномірно;
+- accelerate — прискорення;
+- decelerate — сповільнення;
+- overshoot — вихід за межу й повернення;
+- spring — пружинна поведінка.
 
-```kotlin
-val offset = remember { Animatable(0f) }
+Правильний easing часто важливіший за тривалість.
 
-LaunchedEffect(Unit) {
-    offset.animateTo(
-        targetValue = 100f,
-        animationSpec = tween(durationMillis = 300)
-    )
-}
-```
+9. **Performance**
 
-`Animatable` добре підходить для gesture-driven або coroutine-controlled animations.
+Безпечніше анімувати properties, які не викликають повний layout pass:
 
-13. **Анімації і lifecycle**
+- добре: `alpha`, `translationX/Y`, `scale`, `rotation`;
+- обережно: `width`, `height`, margins, layout params.
 
-У View-системі треба зупиняти анімації, якщо View більше не актуальна:
+Погано робити allocations, bitmap decoding або важкі обчислення в animation frame callbacks.
+
+10. **Lifecycle і cancel**
+
+Анімації треба зупиняти, якщо View більше не актуальна:
 
 ```kotlin
 override fun onDestroyView() {
-    binding.card.animate().cancel()
+    view.animate().cancel()
     super.onDestroyView()
 }
 ```
 
-У RecyclerView item:
+У списках і Fragment це важливо, щоб не отримати візуальні баги або leaks.
 
-```kotlin
-override fun onViewRecycled(holder: UserViewHolder) {
-    holder.clearAnimations()
-    super.onViewRecycled(holder)
-}
-```
+11. **Практичне правило**
 
-Інакше animation state може протекти в recycled item.
+- Для простих View-анімацій — `view.animate()`.
+- Для property animation — `ObjectAnimator`.
+- Для custom values — `ValueAnimator`.
+- Для складних layout transitions — `MotionLayout`.
+- Для Compose — state-driven animation APIs.
+- Для performance — анімувати transform/alpha, не layout.
 
-14. **Performance**
-
-Найбезпечніші properties для View-анімацій:
-
-```text
-alpha
-translationX/Y
-scaleX/Y
-rotation
-```
-
-Вони зазвичай не тригерять повний layout pass.
-
-Дорожчі зміни:
-
-- width/height;
-- margin;
-- layout params;
-- складний redraw;
-- bitmap decoding;
-- heavy work у animation frame.
-
-Якщо анімація змінює layout, треба очікувати більші витрати.
-
-15. **Типові помилки**
-
-- Робити занадто довгі анімації.
-- Анімувати layout params без потреби.
-- Не скасовувати анімації при lifecycle cleanup.
-- Запускати animation у `onBindViewHolder` без контролю.
-- Ігнорувати reduced motion/accessibility.
-- Робити важку роботу в animation update listener.
-- Використовувати анімацію там, де вона заважає UX.
-
-16. **Практичне правило**
-
-- Для простих View-анімацій — `ViewPropertyAnimator`.
-- Для property control — `ObjectAnimator`/`ValueAnimator`.
-- Для складних constraint transitions — `MotionLayout`.
-- Для RecyclerView updates — `DiffUtil` + `ItemAnimator`.
-- Для Compose — `animate*AsState`, `AnimatedVisibility`, `AnimatedContent`, `Animatable`.
-- Анімації мають пояснювати state change, а не приховувати погану логіку.
-- Завжди думати про lifecycle і performance.
-
-**Коротко:** анімації в Android — це керована зміна UI-стану в часі. У View-системі основні інструменти — property animations, transitions і MotionLayout; у Compose — state-driven animation APIs. Хороша анімація має бути швидкою, lifecycle-safe і корисною для UX.
+**Коротко:** анімації в Android змінюють UI state з часом. Основні інструменти — `ViewPropertyAnimator`, `ObjectAnimator`, `ValueAnimator`, `AnimatorSet`, `MotionLayout` і Compose animation APIs. Хороша анімація має бути state-driven, короткою, cancellable і не блокувати rendering.
 
 </details>
 <details>
@@ -43110,27 +41457,20 @@ rotation
 
 #### Kotlin
 
-`ViewBinding` і `DataBinding` — це інструменти для роботи з XML layout-ами без ручного `findViewById`. `ViewBinding` генерує type-safe доступ до View з layout. `DataBinding` додатково дозволяє писати binding expressions у XML, привʼязувати ViewModel/data напряму до layout і підтримує observable updates. ViewBinding простіший, швидший і частіше достатній; DataBinding потужніший, але складніший.
+`ViewBinding` і `DataBinding` прибирають ручний `findViewById`, але мають різну мету. `ViewBinding` просто генерує type-safe доступ до View з XML. `DataBinding` додатково дозволяє писати expressions у XML, привʼязувати data/ViewModel до layout і використовувати `BindingAdapter`. Для нового XML/View-коду ViewBinding зазвичай кращий default: він простіший, легший і прозоріший.
 
 1. **ViewBinding**
 
-ViewBinding генерує binding-клас для кожного XML layout:
+XML:
 
 ```xml
-<!-- activity_main.xml -->
-<LinearLayout
-    android:layout_width="match_parent"
-    android:layout_height="match_parent">
-
-    <TextView
-        android:id="@+id/title"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content" />
-
-</LinearLayout>
+<TextView
+    android:id="@+id/title"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content" />
 ```
 
-У Activity:
+Activity:
 
 ```kotlin
 class MainActivity : AppCompatActivity() {
@@ -43147,9 +41487,11 @@ class MainActivity : AppCompatActivity() {
 }
 ```
 
+ViewBinding дає type-safe references на View і не додає logic у XML.
+
 2. **DataBinding**
 
-DataBinding потребує layout з root `<layout>`:
+DataBinding layout має root `<layout>` і `<data>`:
 
 ```xml
 <layout>
@@ -43159,21 +41501,15 @@ DataBinding потребує layout з root `<layout>`:
             type="com.example.User" />
     </data>
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent">
-
-        <TextView
-            android:id="@+id/title"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@{user.name}" />
-
-    </LinearLayout>
+    <TextView
+        android:id="@+id/title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@{user.name}" />
 </layout>
 ```
 
-У Activity:
+Activity:
 
 ```kotlin
 val binding = DataBindingUtil.setContentView<ActivityMainBinding>(
@@ -43184,63 +41520,26 @@ val binding = DataBindingUtil.setContentView<ActivityMainBinding>(
 binding.user = user
 ```
 
-XML сам бере `user.name` і показує в `TextView`.
+Тут XML сам читає `user.name`.
 
 3. **Головна різниця**
 
 ```text
 ViewBinding:
   - type-safe доступ до View
-  - немає logic у XML
-  - простіший API
-  - менше build overhead
+  - немає XML expressions
+  - менше generated complexity
+  - простіше debug-ити
 
 DataBinding:
-  - binding expressions у XML
+  - XML expressions
   - variables у layout
-  - observable updates
   - BindingAdapters
-  - складніший і важчий
+  - lifecycle-aware binding з LiveData
+  - більше build/runtime complexity
 ```
 
-4. **ViewBinding не має expressions**
-
-У ViewBinding так не можна:
-
-```xml
-android:text="@{user.name}"
-```
-
-Дані встановлюються в Kotlin:
-
-```kotlin
-binding.title.text = user.name
-```
-
-Це робить flow даних явним і легшим для debug.
-
-5. **DataBinding має expressions**
-
-```xml
-android:visibility="@{user.isAdmin ? View.VISIBLE : View.GONE}"
-```
-
-Але складна логіка в XML — погана практика:
-
-```xml
-android:text="@{user.firstName + ` ` + user.lastName + ` (` + user.role + `)`}"
-```
-
-Краще підготувати UI model у ViewModel:
-
-```kotlin
-data class UserUiModel(
-    val displayName: String,
-    val isAdminVisible: Boolean
-)
-```
-
-6. **Fragment з ViewBinding**
+4. **ViewBinding у Fragment**
 
 ```kotlin
 class ProfileFragment : Fragment(R.layout.fragment_profile) {
@@ -43259,9 +41558,9 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
 }
 ```
 
-У Fragment важливо очищати binding у `onDestroyView()`, бо View lifecycle коротший за Fragment lifecycle.
+У Fragment binding треба очищати в `onDestroyView()`, бо View lifecycle коротший за Fragment lifecycle.
 
-7. **Fragment з DataBinding**
+5. **DataBinding у Fragment**
 
 ```kotlin
 class ProfileFragment : Fragment() {
@@ -43286,11 +41585,11 @@ class ProfileFragment : Fragment() {
 }
 ```
 
-`lifecycleOwner` потрібен, щоб DataBinding lifecycle-aware працював з LiveData/observable data.
+`lifecycleOwner` потрібен, щоб binding міг lifecycle-aware працювати з observable data.
 
-8. **BindingAdapter**
+6. **BindingAdapter**
 
-DataBinding підтримує custom binding:
+DataBinding підтримує custom XML attributes:
 
 ```kotlin
 @BindingAdapter("avatarUrl")
@@ -43308,40 +41607,19 @@ XML:
     app:avatarUrl="@{user.avatarUrl}" />
 ```
 
-Це зручно, але може приховати логіку і ускладнити navigation/debug, якщо використовувати без дисципліни.
+Це зручно, але може приховувати логіку, якщо зловживати.
 
-9. **Build performance**
+7. **Чому ViewBinding частіше кращий default**
 
-ViewBinding зазвичай легший для build:
+ViewBinding:
 
-```text
-ViewBinding -> прості generated binding classes
-DataBinding -> expression processing, generated code, більше build complexity
-```
+- менше boilerplate, ніж `findViewById`;
+- не змішує UI logic з XML;
+- легше читати flow даних;
+- менше generated-code проблем;
+- зазвичай швидший і простіший для build.
 
-У великих проєктах DataBinding може збільшувати build time і ускладнювати помилки компіляції.
-
-10. **Type safety**
-
-Обидва дають type-safe доступ до View:
-
-```kotlin
-binding.title.text = "Title"
-```
-
-Але DataBinding додає ще type-checking expressions у XML. Помилки можуть бути менш очевидними, бо generated code і XML expressions іноді дають складніші compiler errors.
-
-11. **Коли використовувати ViewBinding**
-
-ViewBinding — хороший default, якщо:
-
-- треба замінити `findViewById`;
-- UI logic хочеться тримати в Kotlin;
-- проєкт не потребує XML expressions;
-- важлива простота;
-- використовується MVVM/MVI з явним render state.
-
-Приклад:
+Типовий render:
 
 ```kotlin
 fun render(state: ProfileState) {
@@ -43350,21 +41628,19 @@ fun render(state: ProfileState) {
 }
 ```
 
-12. **Коли використовувати DataBinding**
+8. **Коли DataBinding має сенс**
 
-DataBinding може бути доречним, якщо:
+DataBinding доречний, якщо:
 
-- проєкт уже побудований навколо DataBinding;
-- потрібні XML binding expressions;
-- активно використовуються BindingAdapters;
-- є legacy MVVM з LiveData напряму в XML;
-- команда має чіткі правила, що можна писати в XML.
+- проєкт уже побудований на DataBinding;
+- команда активно використовує XML expressions;
+- є legacy MVVM з LiveData в XML;
+- потрібні `BindingAdapter`-и;
+- є чіткі правила, що не можна писати складну business logic у XML.
 
-Але для нового коду часто краще ViewBinding або Compose.
+9. **Compose-контекст**
 
-13. **Compose контекст**
-
-У Compose ні ViewBinding, ні DataBinding не потрібні для UI:
+У Compose ці інструменти не потрібні для UI:
 
 ```kotlin
 @Composable
@@ -43373,34 +41649,33 @@ fun ProfileScreen(state: ProfileState) {
 }
 ```
 
-Для mixed View + Compose проєктів ViewBinding може використовуватися для host XML, а Compose — для нових UI-блоків.
+У mixed проєктах ViewBinding може лишатися для XML screens, а новий UI поступово йти в Compose.
 
-14. **Типові помилки**
+10. **Типові помилки**
 
 ViewBinding:
 
 - не очищати binding у Fragment;
-- використовувати binding після `onDestroyView`;
+- використовувати binding після `onDestroyView()`;
 - тримати binding у ViewModel.
 
 DataBinding:
 
-- писати складну бізнес-логіку в XML;
-- зловживати BindingAdapters;
+- писати складну логіку в XML;
+- зловживати `BindingAdapter`;
 - забути `lifecycleOwner`;
-- отримувати складні generated-code помилки;
-- змішувати UI formatting і domain logic.
+- отримувати важкі для читання generated-code errors.
 
-15. **Практичне правило**
+11. **Практичне правило**
 
-- Якщо потрібен тільки доступ до View — ViewBinding.
-- Якщо потрібні XML expressions і observable binding — DataBinding.
+- Потрібен тільки доступ до View — ViewBinding.
+- Потрібні XML expressions/BindingAdapters — DataBinding.
 - Для нового XML/View коду ViewBinding зазвичай кращий default.
-- Не писати складну логіку в XML.
-- У Fragment очищати binding у `onDestroyView`.
-- У Compose ці інструменти не потрібні для composable UI.
+- У Fragment завжди чистити binding у `onDestroyView()`.
+- Не писати business logic у XML.
+- У Compose ViewBinding/DataBinding для composable UI не потрібні.
 
-**Коротко:** ViewBinding — простий type-safe доступ до View. DataBinding — ширший фреймворк для declarative binding у XML. ViewBinding легший і безпечніший як default, DataBinding має сенс тільки коли справді потрібні XML expressions, BindingAdapters або legacy MVVM-binding підхід.
+**Коротко:** ViewBinding — простий type-safe доступ до View. DataBinding — ширший binding framework з XML expressions і BindingAdapters. Для більшості нового Android XML-коду ViewBinding простіший, безпечніший і дешевший у підтримці.
 
 </details>
 <details>
@@ -46085,43 +44360,26 @@ LaunchedEffect(state.isCompleted) {
 
 #### Kotlin
 
-Оптимізація recomposition у Compose — це не “заборонити recomposition”, а зробити її дешевою, локальною і передбачуваною. Треба правильно моделювати state, передавати stable/immutable дані, розбивати UI на менші composable, використовувати `remember`, `derivedStateOf`, stable keys у lazy lists і не виконувати важку роботу в composable body.
+Оптимізація recomposition у Compose — це не спроба “вимкнути” recomposition, а зробити її локальною, дешевою і передбачуваною. Нормальна модель: state змінюється → Compose перемальовує тільки залежні частини UI. Проблеми починаються, коли state лежить занадто високо, моделі нестабільні або в composable виконується важка робота.
 
-1. **Розуміти, що recomposition — нормальна**
+1. **Тримати state на правильному рівні**
 
-Recomposition — це механізм оновлення UI при зміні state:
+State треба hoist-ити тільки настільки високо, наскільки потрібно.
 
-```text
-state changes -> affected composables recompose -> UI updates
-```
-
-Проблема не в самому факті recomposition, а в тому, що:
-
-- recomposition зачіпає занадто багато UI;
-- у composable body є важка робота;
-- state лежить занадто високо;
-- дані нестабільні;
-- lambdas/objects створюються без потреби;
-- lazy items не мають stable keys.
-
-2. **Тримати state якомога нижче**
-
-Погано:
+Погано, коли зміна тексту в search field змушує recompose-ити великий екран:
 
 ```kotlin
 @Composable
 fun Screen() {
-    var text by remember { mutableStateOf("") }
+    var query by remember { mutableStateOf("") }
 
     Header()
-    SearchField(text, onTextChange = { text = it })
+    SearchField(query, onQueryChange = { query = it })
     HugeContent()
 }
 ```
 
-Якщо `text` змінюється, `Screen` може recompose-ити більше, ніж потрібно.
-
-Краще ізолювати:
+Краще ізолювати локальний state:
 
 ```kotlin
 @Composable
@@ -46133,46 +44391,12 @@ fun Screen() {
 
 @Composable
 fun SearchSection() {
-    var text by remember { mutableStateOf("") }
-    SearchField(text, onTextChange = { text = it })
+    var query by remember { mutableStateOf("") }
+    SearchField(query, onQueryChange = { query = it })
 }
 ```
 
-3. **State hoisting там, де це потрібно**
-
-State має бути там, де його треба контролювати:
-
-```kotlin
-@Composable
-fun SearchField(
-    query: String,
-    onQueryChange: (String) -> Unit
-) {
-    TextField(
-        value = query,
-        onValueChange = onQueryChange
-    )
-}
-```
-
-Але не треба піднімати state вище без потреби. Надто високий state збільшує область recomposition.
-
-4. **Розбивати UI на менші composable**
-
-Погано:
-
-```kotlin
-@Composable
-fun ProfileScreen(state: ProfileState) {
-    // header
-    // tabs
-    // list
-    // footer
-    // dialogs
-}
-```
-
-Краще:
+2. **Розбивати UI на менші composable**
 
 ```kotlin
 @Composable
@@ -46184,9 +44408,9 @@ fun ProfileScreen(state: ProfileState) {
 }
 ```
 
-Compose може краще skip-ати/локалізувати recomposition, коли UI розбитий на стабільні частини.
+Так Compose легше skip-ає частини UI, параметри яких не змінилися.
 
-5. **Використовувати immutable models**
+3. **Використовувати immutable/stable моделі**
 
 Погано:
 
@@ -46208,40 +44432,27 @@ data class UserUiModel(
 )
 ```
 
-Immutable data class з `val` полями дає Compose більше шансів вважати параметри stable і skip-ати recomposition.
+Такі моделі простіше порівнювати, безпечніше передавати в composable і легше використовувати для skip recomposition.
 
-6. **Не передавати mutable collections**
+4. **Не мутувати списки in-place**
 
 Погано:
 
 ```kotlin
-@Composable
-fun UserList(users: MutableList<UserUiModel>) {
-    LazyColumn {
-        items(users) { user -> UserItem(user) }
-    }
-}
+users.add(newUser)
 ```
 
-Краще:
+Краще створювати новий snapshot:
 
 ```kotlin
-@Composable
-fun UserList(users: List<UserUiModel>) {
-    LazyColumn {
-        items(
-            items = users,
-            key = { it.id }
-        ) { user ->
-            UserItem(user)
-        }
-    }
-}
+state = state.copy(
+    users = state.users + newUser
+)
 ```
 
-І формувати новий list snapshot при зміні.
+Composable API краще приймає `List<T>`, а не `MutableList<T>`.
 
-7. **Stable keys у lazy lists**
+5. **Ставити key у LazyColumn**
 
 ```kotlin
 LazyColumn {
@@ -46254,83 +44465,25 @@ LazyColumn {
 }
 ```
 
-Без key Compose орієнтується на позицію. При insert/remove state item-ів може зміститися, і recomposition буде менш контрольованою.
+`key` привʼязує remembered state і item identity до конкретного елемента, а не до позиції. Це критично при insert/delete/sort/filter.
 
-8. **contentType у lazy lists**
-
-Для mixed list:
+6. **Використовувати contentType для mixed lists**
 
 ```kotlin
 LazyColumn {
     items(
-        items = feed,
-        key = { item -> item.id },
-        contentType = { item -> item::class }
+        items = feedItems,
+        key = { it.id },
+        contentType = { it::class }
     ) { item ->
-        when (item) {
-            is FeedItem.Header -> HeaderItem(item)
-            is FeedItem.Post -> PostItem(item)
-        }
+        FeedItem(item)
     }
 }
 ```
 
-`contentType` допомагає Compose ефективніше reuse-ити item compositions для однакових типів.
+`contentType` допомагає Compose ефективніше перевикористовувати item compositions одного типу.
 
-9. **remember для expensive objects**
-
-Погано:
-
-```kotlin
-@Composable
-fun Chart(data: List<Point>) {
-    val formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
-    // ...
-}
-```
-
-Краще:
-
-```kotlin
-@Composable
-fun Chart(data: List<Point>) {
-    val formatter = remember {
-        DateTimeFormatter.ofPattern("dd.MM.yyyy")
-    }
-}
-```
-
-`remember` зберігає обʼєкт між recompositions.
-
-10. **remember з keys**
-
-Якщо remembered value залежить від параметра:
-
-```kotlin
-val filteredUsers = remember(users, query) {
-    users.filter { it.name.contains(query, ignoreCase = true) }
-}
-```
-
-Без keys можна отримати застаріле значення. Занадто багато keys — зайві перерахунки.
-
-11. **derivedStateOf**
-
-Якщо derived value змінюється рідше, ніж source state:
-
-```kotlin
-val listState = rememberLazyListState()
-
-val showButton by remember {
-    derivedStateOf {
-        listState.firstVisibleItemIndex > 0
-    }
-}
-```
-
-Scroll position змінюється часто, але `showButton` змінюється тільки між `false` і `true`.
-
-12. **Не робити heavy work у composable body**
+7. **Не робити важку роботу в composable body**
 
 Погано:
 
@@ -46344,15 +44497,7 @@ fun UserList(users: List<User>) {
 }
 ```
 
-Краще підготувати у ViewModel:
-
-```kotlin
-val uiState = users
-    .map { users -> users.sortedBy { it.name } }
-    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-```
-
-Або хоча б:
+Краще підготувати дані у ViewModel або кешувати обчислення:
 
 ```kotlin
 val sorted = remember(users) {
@@ -46360,51 +44505,47 @@ val sorted = remember(users) {
 }
 ```
 
-13. **Лямбди і stability**
+Але якщо це business/UI transformation для всього екрана — краще винести у ViewModel/use case mapper.
 
-Якщо callback передається глибоко, краще мати стабільний callback з parent:
+8. **remember для дорогих обʼєктів**
 
 ```kotlin
-UserItem(
-    user = user,
-    onClick = { onUserClick(user.id) }
-)
+val formatter = remember {
+    DateTimeFormatter.ofPattern("dd.MM.yyyy")
+}
 ```
 
-У lazy list це нормально, але якщо є performance issue, можна структурувати API так:
+Якщо значення залежить від параметрів, додати keys:
 
 ```kotlin
-UserItem(
-    user = user,
-    onClick = onUserClick
-)
+val filteredUsers = remember(users, query) {
+    users.filter { it.name.contains(query, ignoreCase = true) }
+}
 ```
 
+9. **derivedStateOf для часто змінного state**
+
 ```kotlin
-@Composable
-fun UserItem(
-    user: UserUiModel,
-    onClick: (String) -> Unit
-) {
-    Button(onClick = { onClick(user.id) }) {
-        Text(user.name)
+val listState = rememberLazyListState()
+
+val showScrollTop by remember {
+    derivedStateOf {
+        listState.firstVisibleItemIndex > 0
     }
 }
 ```
 
-Не варто передчасно оптимізувати lambdas, але треба розуміти їх вплив.
+Scroll state змінюється часто, але button visibility змінюється рідко. `derivedStateOf` зменшує зайві invalidations.
 
-14. **collectAsStateWithLifecycle**
-
-Для Flow у Android:
+10. **Lifecycle-aware collection**
 
 ```kotlin
 val state by viewModel.state.collectAsStateWithLifecycle()
 ```
 
-Це lifecycle-aware collection і менше шансів оновлювати UI, коли екран неактивний.
+Це краще для Android, ніж collect без lifecycle, бо UI не буде оновлюватися, коли screen неактивний.
 
-15. **Не створювати state без remember**
+11. **Не створювати state без remember**
 
 Погано:
 
@@ -46415,8 +44556,6 @@ fun Counter() {
 }
 ```
 
-Кожна recomposition створить новий state.
-
 Правильно:
 
 ```kotlin
@@ -46426,53 +44565,32 @@ fun Counter() {
 }
 ```
 
-16. **Use stable UI state**
+12. **Профілювати, а не гадати**
 
-```kotlin
-@Immutable
-data class ProfileState(
-    val user: UserUiModel,
-    val isLoading: Boolean,
-    val errorMessage: String?
-)
-```
+Для реальної оптимізації дивитися:
 
-Стабільний UI state з immutable полями краще для Compose, ніж набір mutable objects.
-
-17. **Профілювання**
-
-Не оптимізувати наосліп. Використовувати:
-
-- Layout Inspector recomposition counts;
+- Layout Inspector recomposition counters;
 - Compose compiler reports;
 - Android Studio Profiler;
-- tracing;
-- baseline profiles для startup/runtime performance.
+- System Trace;
+- Macrobenchmark;
+- baseline profiles.
 
-Якщо recomposition count високий, але composable дешевий — це може бути не проблема.
+Високий recomposition count не завжди проблема, якщо composable дешевий. Проблема — дорога робота на main thread, зайвий layout/draw або нестабільні параметри.
 
-18. **Типові помилки**
+13. **Практичне правило**
 
-- Вважати будь-яку recomposition багом.
-- Робити сортування/фільтрацію/парсинг у composable body.
-- Передавати mutable models.
-- Не ставити keys у lazy lists.
-- Тримати весь screen state занадто високо.
-- Створювати expensive objects без `remember`.
-- Використовувати `derivedStateOf` всюди без потреби.
-
-19. **Практичне правило**
-
-- State має бути стабільний і immutable.
 - State тримати на найнижчому достатньому рівні.
-- UI розбивати на малі composable.
-- У lazy lists ставити `key` і за потреби `contentType`.
-- Expensive calculations — у ViewModel або `remember`.
-- Часті derived reads — `derivedStateOf`.
-- Side effects — тільки через effect APIs.
+- UI розбивати на маленькі composable.
+- Передавати immutable/stable UI models.
+- Не мутувати списки in-place.
+- У lazy lists використовувати `key`, а для mixed lists ще й `contentType`.
+- Heavy calculations робити у ViewModel або кешувати через `remember`.
+- Scroll-derived state обгортати в `derivedStateOf`.
+- Side effects запускати тільки через effect APIs.
 - Спочатку міряти, потім оптимізувати.
 
-**Коротко:** recomposition оптимізують через правильну модель state, immutable/stable параметри, локалізацію state, stable keys у lazy lists, `remember` для дорогих обчислень і профілювання. Recomposition сама по собі нормальна; проблема — дорога або надто широка recomposition.
+**Коротко:** recomposition оптимізують через правильну модель state, immutable параметри, локалізацію state, stable keys у lazy lists, кешування дорогих обчислень і профілювання. Recomposition сама по собі нормальна; проблема — дорога або занадто широка recomposition.
 
 </details>
 <details>
@@ -46480,123 +44598,70 @@ data class ProfileState(
 
 #### Kotlin
 
-Асинхронний тест без корутин можна написати через callback-based синхронізацію: `CountDownLatch`, `CompletableFuture`, test callback, Espresso `IdlingResource`, LiveData helper або інструменти на кшталт Awaitility. Ідея одна: тест має дочекатися завершення async-операції з timeout, перевірити результат і не зависнути назавжди.
+Асинхронний тест без корутин пишуть через контрольоване очікування результату: callback, `CountDownLatch`, `CompletableFuture`, Awaitility, LiveData helper або Espresso `IdlingResource`. Ключове правило: тест має чекати конкретну подію з timeout, а не робити `Thread.sleep()`.
 
 1. **CountDownLatch**
 
-Найпростіший JVM-підхід:
+Найпростіший callback-based підхід:
 
 ```kotlin
 @Test
 fun `loads user successfully`() {
     val latch = CountDownLatch(1)
-    var result: User? = null
-    var error: Throwable? = null
+    val result = AtomicReference<User?>()
+    val error = AtomicReference<Throwable?>()
 
-    repository.loadUser(
-        userId = "42",
-        callback = object : UserCallback {
-            override fun onSuccess(user: User) {
-                result = user
-                latch.countDown()
-            }
-
-            override fun onError(throwable: Throwable) {
-                error = throwable
-                latch.countDown()
-            }
+    repository.loadUser("42", object : UserCallback {
+        override fun onSuccess(user: User) {
+            result.set(user)
+            latch.countDown()
         }
-    )
+
+        override fun onError(throwable: Throwable) {
+            error.set(throwable)
+            latch.countDown()
+        }
+    })
 
     val completed = latch.await(2, TimeUnit.SECONDS)
 
     assertTrue(completed)
-    assertNull(error)
-    assertEquals("42", result?.id)
+    assertNull(error.get())
+    assertEquals("42", result.get()?.id)
 }
 ```
 
 Timeout обовʼязковий. Без нього тест може зависнути назавжди.
 
-2. **Чому timeout важливий**
-
-Погано:
-
-```kotlin
-latch.await()
-```
-
-Якщо callback не викличеться, тест зависне.
-
-Правильно:
-
-```kotlin
-val completed = latch.await(2, TimeUnit.SECONDS)
-assertTrue("Callback was not called", completed)
-```
-
-Timeout робить fail явним і контрольованим.
-
-3. **Перевірка error case**
+2. **Error scenario**
 
 ```kotlin
 @Test
 fun `returns error when api fails`() {
     val latch = CountDownLatch(1)
-    var actualError: Throwable? = null
+    val error = AtomicReference<Throwable?>()
 
-    repository.loadUser(
-        userId = "invalid",
-        callback = object : UserCallback {
-            override fun onSuccess(user: User) {
-                latch.countDown()
-            }
-
-            override fun onError(throwable: Throwable) {
-                actualError = throwable
-                latch.countDown()
-            }
+    repository.loadUser("invalid", object : UserCallback {
+        override fun onSuccess(user: User) {
+            latch.countDown()
         }
-    )
+
+        override fun onError(throwable: Throwable) {
+            error.set(throwable)
+            latch.countDown()
+        }
+    })
 
     assertTrue(latch.await(2, TimeUnit.SECONDS))
-    assertTrue(actualError is IOException)
+    assertTrue(error.get() is IOException)
 }
 ```
 
-Тест має явно перевіряти і success, і failure path.
+Хороший async-тест перевіряє не тільки success path, а й failure path.
 
-4. **AtomicReference для thread-safety**
+3. **CompletableFuture**
 
-Якщо callback викликається з іншого thread, краще використовувати thread-safe контейнер:
-
-```kotlin
-val result = AtomicReference<User?>()
-val error = AtomicReference<Throwable?>()
-val latch = CountDownLatch(1)
-
-repository.loadUser("42", object : UserCallback {
-    override fun onSuccess(user: User) {
-        result.set(user)
-        latch.countDown()
-    }
-
-    override fun onError(throwable: Throwable) {
-        error.set(throwable)
-        latch.countDown()
-    }
-})
-
-assertTrue(latch.await(2, TimeUnit.SECONDS))
-assertNull(error.get())
-assertEquals("42", result.get()?.id)
-```
-
-Для простих тестів локальні змінні часто працюють, але `AtomicReference` коректніший для cross-thread visibility.
-
-5. **CompletableFuture**
-
-Для Java-style async API:
+Зручно, коли хочеться отримати результат як value:
 
 ```kotlin
 @Test
@@ -46619,11 +44684,11 @@ fun `loads user with future`() {
 }
 ```
 
-Це зручно, коли треба отримати результат як value.
+Це чистіше за окремі mutable змінні, якщо callback має один результат.
 
-6. **Awaitility**
+4. **Awaitility або polling helper**
 
-Якщо в проєкті є Awaitility, можна чекати умову:
+Для state, який змінюється асинхронно:
 
 ```kotlin
 @Test
@@ -46638,20 +44703,17 @@ fun `updates cache`() {
 }
 ```
 
-Це читабельніше, ніж manual sleep/polling.
-
-Погано:
+Це краще за:
 
 ```kotlin
 Thread.sleep(1000)
-assertEquals(1, cache.size)
 ```
 
 `sleep` робить тести повільними і flaky.
 
-7. **LiveData getOrAwaitValue**
+5. **LiveData helper**
 
-Для LiveData часто пишуть helper:
+Для LiveData часто використовують `getOrAwaitValue()`:
 
 ```kotlin
 fun <T> LiveData<T>.getOrAwaitValue(
@@ -46681,55 +44743,33 @@ fun <T> LiveData<T>.getOrAwaitValue(
 }
 ```
 
-Тест:
-
-```kotlin
-val value = viewModel.state.getOrAwaitValue()
-assertEquals(ProfileState.Loading, value)
-```
-
-8. **InstantTaskExecutorRule**
-
-Для LiveData unit-тестів потрібне synchronous виконання Architecture Components:
+У тестах LiveData також потрібен:
 
 ```kotlin
 @get:Rule
 val instantTaskExecutorRule = InstantTaskExecutorRule()
 ```
 
-Це змушує LiveData/Arch tasks виконуватися синхронніше у test environment.
+6. **Espresso IdlingResource**
 
-9. **Espresso IdlingResource**
-
-Для UI-тестів не треба вручну sleep-ити. Espresso може чекати `IdlingResource`:
+Для UI-тестів краще не чекати руками, а повідомити Espresso, коли app busy/idle:
 
 ```kotlin
-class CountingAppIdlingResource {
-    val idlingResource = CountingIdlingResource("app")
+val idlingResource = CountingIdlingResource("app")
 
-    fun increment() = idlingResource.increment()
-    fun decrement() {
-        if (!idlingResource.isIdleNow) {
-            idlingResource.decrement()
-        }
+fun loadData() {
+    idlingResource.increment()
+    api.loadData {
+        idlingResource.decrement()
     }
-}
-```
-
-Перед async operation:
-
-```kotlin
-idlingResource.increment()
-api.loadData {
-    idlingResource.decrement()
 }
 ```
 
 Espresso дочекається idle state перед assertion.
 
-10. **Fake замість реального async**
+7. **Fake dependency замість реального async**
 
-Найкращий тест часто не чекає реальний async, а контролює залежність:
+Найкращий тест часто не чекає реальний час, а контролює fake:
 
 ```kotlin
 class FakeUserApi : UserApi {
@@ -46745,16 +44785,16 @@ class FakeUserApi : UserApi {
 }
 ```
 
-Тест:
+Тест сам вирішує, коли async operation завершується:
 
 ```kotlin
 repository.loadUser("42", callback)
 fakeApi.complete(User(id = "42", name = "Alex"))
 ```
 
-Це дає deterministic test без real delay.
+Це deterministic і швидше за реальні delays.
 
-11. **Не використовувати Thread.sleep як основний механізм**
+8. **Що не робити**
 
 Погано:
 
@@ -46766,36 +44806,23 @@ assertEquals(expected, repository.currentValue)
 
 Проблеми:
 
-- flaky;
-- повільно;
-- залежить від machine speed;
+- тест повільний;
+- flaky на слабших машинах;
 - не гарантує завершення async work;
+- приховує race conditions;
 - збільшує час test suite.
 
-Краще чекати конкретну умову або callback.
+9. **Практичне правило**
 
-12. **Що саме тестувати**
-
-Асинхронний тест має відповідати на питання:
-
-- яка операція стартує;
-- який callback/event/result очікується;
-- який timeout;
-- що робимо при error;
-- чи test deterministic;
-- чи немає реального network/time dependency.
-
-13. **Практичне правило**
-
-- Callback-based async — `CountDownLatch` або `CompletableFuture`.
-- State polling — Awaitility або власний polling helper з timeout.
-- LiveData — `InstantTaskExecutorRule` + `getOrAwaitValue`.
+- Callback async — `CountDownLatch` або `CompletableFuture`.
+- State polling — Awaitility/helper з timeout.
+- LiveData — `InstantTaskExecutorRule` + `getOrAwaitValue()`.
 - UI tests — Espresso `IdlingResource`.
-- Не використовувати `Thread.sleep`.
-- Краще fake dependency, ніж чекати реальний час.
-- Timeout має бути в кожному async test.
+- Не використовувати `Thread.sleep()` як механізм синхронізації.
+- Краще fake dependency, ніж реальний network/time.
+- У кожного async test має бути timeout.
 
-**Коротко:** без корутин асинхронний тест пишуть через контрольоване очікування callback/result з timeout. Найчастіше це `CountDownLatch`, `CompletableFuture`, Awaitility, LiveData test helper або Espresso `IdlingResource`, але не `Thread.sleep`.
+**Коротко:** асинхронний тест без корутин пишеться через очікування конкретного callback/result/state з timeout. Найчастіше це `CountDownLatch`, `CompletableFuture`, Awaitility, LiveData helper або Espresso `IdlingResource`; `Thread.sleep()` краще не використовувати.
 
 </details>
 <details>
@@ -48907,11 +46934,11 @@ Worker завантажить дані з Room/file/repository.
 
 #### Kotlin
 
-Так, з Media3 / ExoPlayer важливо розуміти, що це основний сучасний стек Android для програвання audio/video. Media3 — це Jetpack-обгортка і розвиток ExoPlayer, яка обʼєднує player, session, UI components і background playback APIs. ExoPlayer у Media3 використовується через `androidx.media3.exoplayer.ExoPlayer`.
+Так. Media3 / ExoPlayer — це сучасний Android-стек для audio/video playback. Media3 обʼєднує player, UI components, media session і background playback APIs. У Media3 ExoPlayer використовується через `androidx.media3.exoplayer.ExoPlayer`.
 
 1. **Що таке Media3**
 
-Media3 — це набір бібліотек:
+Основні модулі:
 
 ```text
 media3-exoplayer
@@ -48920,32 +46947,28 @@ media3-session
 media3-common
 ```
 
-Він покриває:
+Вони покривають:
 
-- video/audio playback;
-- adaptive streaming;
+- audio/video playback;
+- HLS/DASH/progressive media;
 - player UI;
 - media session;
 - background playback;
 - notification controls;
-- integration з Android media ecosystem.
+- Android media ecosystem integration.
 
 2. **Базове створення ExoPlayer**
 
 ```kotlin
-val player = ExoPlayer.Builder(context)
-    .build()
-```
+val player = ExoPlayer.Builder(context).build()
 
-Media item:
-
-```kotlin
 val mediaItem = MediaItem.fromUri(videoUrl)
-
 player.setMediaItem(mediaItem)
 player.prepare()
 player.play()
 ```
+
+Це мінімальний сценарій для програвання одного media item.
 
 3. **PlayerView**
 
@@ -48964,11 +46987,11 @@ Fragment:
 binding.playerView.player = player
 ```
 
-`PlayerView` дає готовий UI для video playback: surface, controls, buffering indicator.
+`PlayerView` дає surface, controls, buffering UI і базову інтеграцію з player-ом.
 
-4. **Lifecycle**
+4. **Lifecycle і release**
 
-Player треба правильно створювати і звільняти:
+Player треба створювати і звільняти відповідно до lifecycle screen-а:
 
 ```kotlin
 private var player: ExoPlayer? = null
@@ -48983,14 +47006,6 @@ override fun onStop() {
     super.onStop()
 }
 
-private fun initializePlayer() {
-    player = ExoPlayer.Builder(requireContext()).build().also { exoPlayer ->
-        binding.playerView.player = exoPlayer
-        exoPlayer.setMediaItem(MediaItem.fromUri(videoUrl))
-        exoPlayer.prepare()
-    }
-}
-
 private fun releasePlayer() {
     binding.playerView.player = null
     player?.release()
@@ -48998,11 +47013,11 @@ private fun releasePlayer() {
 }
 ```
 
-У реальному додатку lifecycle може залежати від API level, background playback requirements і UX.
+Головне правило: якщо створили player — треба гарантовано викликати `release()`.
 
 5. **Збереження позиції**
 
-Перед release варто зберегти позицію:
+Перед release варто зберегти playback state:
 
 ```kotlin
 private var playbackPosition: Long = 0L
@@ -49018,7 +47033,7 @@ private fun releasePlayer() {
 }
 ```
 
-Відновлення:
+При повторній ініціалізації:
 
 ```kotlin
 exoPlayer.seekTo(playbackPosition)
@@ -49046,30 +47061,9 @@ player.addListener(
 )
 ```
 
-Listener потрібен для UI state, analytics, retry, error handling.
+Важливо: `STATE_READY` не завжди означає, що playback іде прямо зараз. Треба також дивитися на `playWhenReady` і `isPlaying`.
 
-7. **Buffering states**
-
-Основні стани:
-
-```text
-STATE_IDLE
-STATE_BUFFERING
-STATE_READY
-STATE_ENDED
-```
-
-Окремо є:
-
-```kotlin
-player.isPlaying
-player.playWhenReady
-player.playbackState
-```
-
-`STATE_READY` не завжди означає, що відео прямо зараз грає. Треба враховувати `playWhenReady`.
-
-8. **Adaptive streaming**
+7. **Streaming formats**
 
 ExoPlayer підтримує:
 
@@ -49081,29 +47075,17 @@ ExoPlayer підтримує:
 Приклад HLS:
 
 ```kotlin
-val mediaItem = MediaItem.fromUri("https://example.com/video.m3u8")
-player.setMediaItem(mediaItem)
+player.setMediaItem(
+    MediaItem.fromUri("https://example.com/video.m3u8")
+)
 player.prepare()
 ```
 
-ExoPlayer сам підбере потрібний media source через default factory, якщо dependencies підключені.
+За наявності потрібних dependencies ExoPlayer сам підбере media source через default factory.
 
-9. **Caching**
+8. **Background playback**
 
-Для кешування можна використовувати `SimpleCache` і custom data source. Концептуально:
-
-```kotlin
-val cache = SimpleCache(
-    cacheDir,
-    LeastRecentlyUsedCacheEvictor(maxCacheSize)
-)
-```
-
-Потім будується `CacheDataSource.Factory`. Це корисно для повторного перегляду, але треба керувати розміром cache і lifecycle singleton-обʼєкта.
-
-10. **Background playback**
-
-Для audio/background playback потрібні:
+Для audio/background playback потрібні не просто `ExoPlayer`, а:
 
 - `MediaSession`;
 - foreground service;
@@ -49117,7 +47099,9 @@ Media3 має `MediaSessionService`:
 class PlaybackService : MediaSessionService() {
     private var mediaSession: MediaSession? = null
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
+    override fun onGetSession(
+        controllerInfo: MediaSession.ControllerInfo
+    ): MediaSession? {
         return mediaSession
     }
 }
@@ -49125,9 +47109,9 @@ class PlaybackService : MediaSessionService() {
 
 Для простого video screen це не потрібно, але для music app — критично.
 
-11. **Audio focus**
+9. **Audio focus**
 
-Для audio треба враховувати audio focus:
+Для audio треба налаштовувати audio attributes:
 
 ```kotlin
 player.setAudioAttributes(
@@ -49139,11 +47123,11 @@ player.setAudioAttributes(
 )
 ```
 
-Другий параметр `handleAudioFocus = true` дозволяє player-у управляти audio focus.
+`handleAudioFocus = true` дозволяє player-у керувати audio focus.
 
-12. **Compose integration**
+10. **Compose integration**
 
-У Compose можна використати `AndroidView`:
+У Compose зазвичай використовують `AndroidView`:
 
 ```kotlin
 @Composable
@@ -49161,14 +47145,9 @@ fun VideoPlayer(player: ExoPlayer) {
 }
 ```
 
-Player краще створювати через `remember` і звільняти через `DisposableEffect`:
+Player release — через `DisposableEffect`:
 
 ```kotlin
-val context = LocalContext.current
-val player = remember {
-    ExoPlayer.Builder(context).build()
-}
-
 DisposableEffect(Unit) {
     onDispose {
         player.release()
@@ -49176,15 +47155,15 @@ DisposableEffect(Unit) {
 }
 ```
 
-13. **RecyclerView/feed video**
+11. **Відео в списку**
 
-Якщо відео в списку:
+Для feed/RecyclerView/Compose list:
 
-- не створювати player для кожного item без потреби;
-- контролювати visible item;
-- release при recycling;
-- уникати одночасного playback багатьох player-ів;
-- думати про cache і preloading.
+- не створювати player для кожного item без контролю;
+- release player при recycling/dispose;
+- програвати тільки visible item;
+- не запускати багато player-ів одночасно;
+- думати про cache/preload.
 
 Погано:
 
@@ -49194,30 +47173,28 @@ fun bind(item: VideoItem) {
 }
 ```
 
-Це швидко зʼїсть ресурси.
-
-14. **Типові помилки**
+12. **Типові помилки**
 
 - Не викликати `release()`.
-- Тримати player у Fragment після `onDestroyView`.
+- Тримати player після `onDestroyView()`.
 - Не зберігати playback position.
 - Плутати `STATE_READY` і `isPlaying`.
-- Створювати багато player-ів у списку.
-- Ігнорувати audio focus для audio playback.
-- Робити background playback без foreground service/media session.
-- Не обробляти `PlaybackException`.
+- Створювати багато player instances у списку.
+- Ігнорувати `PlaybackException`.
+- Робити background playback без `MediaSession`/foreground service.
+- Не налаштовувати audio focus для audio playback.
 
-15. **Практичне правило**
+13. **Практичне правило**
 
-- Для простого video screen — `ExoPlayer` + `PlayerView`.
-- Для Compose — `AndroidView(PlayerView)` + `DisposableEffect`.
-- Для audio/background — Media3 Session + foreground service.
+- Простий video screen — `ExoPlayer` + `PlayerView`.
+- Compose — `AndroidView(PlayerView)` + `DisposableEffect`.
+- Audio/background — `MediaSessionService` + foreground notification.
 - Player lifecycle має відповідати screen/service lifecycle.
 - Завжди release player.
-- Для UI state слухати `Player.Listener`.
-- Для feed/list video уважно контролювати кількість player instances.
+- UI state слухати через `Player.Listener`.
+- У списках обмежувати кількість player instances.
 
-**Коротко:** Media3 / ExoPlayer — це сучасний Android-стек для audio/video playback. Важливо не тільки запустити `player.play()`, а й правильно керувати lifecycle, buffering/error states, playback position, audio focus, background playback і release ресурсів.
+**Коротко:** Media3 / ExoPlayer — це основний Android-стек для audio/video playback. Важливо не тільки запустити `play()`, а й правильно керувати lifecycle, release, buffering/error states, playback position, audio focus і background playback.
 
 </details>
 <details>
@@ -49558,22 +47535,74 @@ Button(onClick = {
 
 #### Kotlin
 
-Щоб уникнути лагів у Compose під час скролу, треба зменшити роботу на кожен frame: не робити важкі обчислення в composable, використовувати `LazyColumn` з stable `key` і `contentType`, передавати immutable/stable models, оптимізувати images, уникати зайвих recompositions, не створювати дорогі обʼєкти в item, використовувати `remember`, `derivedStateOf`, Paging і профілювання.
+Лаги під час скролу в Compose зазвичай виникають не через сам `LazyColumn`, а через важкий item content, нестабільні моделі, зайві recompositions, великі images, allocation у composable body або blocking роботу на main thread. Оптимізація має починатися з профілювання, а не з випадкового додавання `remember` всюди.
 
-1. **Не робити heavy work у item**
+1. **Використовувати LazyColumn, а не Column**
+
+Погано для великих списків:
+
+```kotlin
+Column {
+    users.forEach { user ->
+        UserItem(user)
+    }
+}
+```
+
+Краще:
+
+```kotlin
+LazyColumn {
+    items(
+        items = users,
+        key = { it.id }
+    ) { user ->
+        UserItem(user)
+    }
+}
+```
+
+`LazyColumn` створює тільки item-и, потрібні для viewport.
+
+2. **Ставити stable key**
+
+```kotlin
+items(
+    items = users,
+    key = { user -> user.id }
+) { user ->
+    UserItem(user)
+}
+```
+
+`key` не дає remembered state і composition identity привʼязатися до позиції. Це особливо важливо при insert/delete/filter/sort.
+
+3. **Використовувати contentType для mixed list**
+
+```kotlin
+items(
+    items = feedItems,
+    key = { it.id },
+    contentType = { it::class }
+) { item ->
+    FeedItem(item)
+}
+```
+
+`contentType` допомагає Compose ефективніше reuse-ити item compositions одного типу: header, post, ad, loader.
+
+4. **Не робити важкі обчислення в item**
 
 Погано:
 
 ```kotlin
 LazyColumn {
     items(users) { user ->
-        val formattedDate = expensiveDateFormat(user.createdAt)
+        val formattedDate = expensiveFormat(user.createdAt)
         UserItem(user, formattedDate)
     }
 }
 ```
-
-Це може виконуватися під час scroll/recomposition.
 
 Краще підготувати UI model у ViewModel:
 
@@ -49585,52 +47614,15 @@ data class UserUiModel(
 )
 ```
 
-Або хоча б:
+Або мінімум кешувати:
 
 ```kotlin
 val formattedDate = remember(user.createdAt) {
-    expensiveDateFormat(user.createdAt)
+    expensiveFormat(user.createdAt)
 }
 ```
 
-2. **Stable key у LazyColumn**
-
-```kotlin
-LazyColumn {
-    items(
-        items = users,
-        key = { user -> user.id }
-    ) { user ->
-        UserItem(user)
-    }
-}
-```
-
-`key` допомагає Compose правильно зберігати item identity при insert/remove/move. Без key state може переїжджати між item-ами, а recomposition буде менш контрольованою.
-
-3. **contentType для різних item**
-
-Для mixed feed:
-
-```kotlin
-LazyColumn {
-    items(
-        items = feedItems,
-        key = { item -> item.id },
-        contentType = { item -> item::class }
-    ) { item ->
-        when (item) {
-            is FeedItem.Header -> HeaderItem(item)
-            is FeedItem.Post -> PostItem(item)
-            is FeedItem.Ad -> AdItem(item)
-        }
-    }
-}
-```
-
-`contentType` допомагає Compose ефективніше reuse-ити compositions для item одного типу.
-
-4. **Immutable UI models**
+5. **Передавати immutable UI models**
 
 Погано:
 
@@ -49652,60 +47644,49 @@ data class UserUiModel(
 )
 ```
 
-Compose краще працює з immutable/stable даними.
+Так Compose легше визначає, що параметри стабільні, і може skip-ати зайві recompositions.
 
-5. **Не передавати mutable lists**
+6. **Не мутувати списки in-place**
 
 Погано:
 
 ```kotlin
-@Composable
-fun UserList(users: MutableList<UserUiModel>)
+users.add(newUser)
 ```
 
 Краще:
 
 ```kotlin
-@Composable
-fun UserList(users: List<UserUiModel>)
+state = state.copy(
+    users = state.users + newUser
+)
 ```
 
-І оновлювати список новим snapshot:
+Для Compose важливі стабільні snapshots, а не прихована мутація mutable collection.
 
-```kotlin
-state = state.copy(users = state.users + newUser)
-```
+7. **Оптимізувати images**
 
-6. **Оптимізувати images**
+Частий source jank — картинки. Правила:
 
-Лаги під час скролу часто через картинки:
+- не декодувати bitmap вручну в composable;
+- задавати стабільний розмір;
+- використовувати Coil/інший loader із cache;
+- не робити crossfade без потреби у великих списках;
+- не завантажувати оригінал 4000px для avatar 48dp.
 
-- занадто великі images;
-- немає cache;
-- placeholder flicker;
-- decoding на UI path;
-- нестабільні image requests.
-
-Приклад з Coil:
+Приклад:
 
 ```kotlin
 AsyncImage(
-    model = ImageRequest.Builder(LocalContext.current)
-        .data(user.avatarUrl)
-        .crossfade(false)
-        .build(),
+    model = user.avatarUrl,
     contentDescription = null,
     modifier = Modifier.size(48.dp)
 )
 ```
 
-Не треба декодувати bitmap вручну в composable.
+8. **Фіксувати розміри item, де це можливо**
 
-7. **Фіксувати розміри item**
-
-Якщо item-и постійно змінюють розмір під час завантаження image/content, scroll може смикатися.
-
-Краще:
+Якщо image/content змінює розмір після завантаження, scroll може смикатися.
 
 ```kotlin
 AsyncImage(
@@ -49719,25 +47700,7 @@ AsyncImage(
 
 Стабільний layout зменшує remeasure/re-layout cost.
 
-8. **remember для дорогих обʼєктів**
-
-Погано:
-
-```kotlin
-val formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
-```
-
-Краще:
-
-```kotlin
-val formatter = remember {
-    DateTimeFormatter.ofPattern("dd.MM.yyyy")
-}
-```
-
-У lazy item треба бути уважним: remembered state scoped до item composition і має мати правильний key.
-
-9. **derivedStateOf для scroll-derived state**
+9. **derivedStateOf для scroll-derived UI**
 
 ```kotlin
 val listState = rememberLazyListState()
@@ -49749,52 +47712,25 @@ val showScrollTop by remember {
 }
 ```
 
-Scroll offset змінюється дуже часто. `derivedStateOf` допомагає оновлювати UI тільки коли derived boolean реально змінився.
+Scroll state змінюється часто, але UI-прапорець може змінюватися рідко.
 
-10. **Не читати часто змінний state занадто високо**
+10. **snapshotFlow для scroll side effects**
 
-Погано:
-
-```kotlin
-val firstVisible = listState.firstVisibleItemIndex
-
-Column {
-    Toolbar(firstVisible)
-    HugeList()
-}
-```
-
-Якщо state читається високо, може recompose-итися великий subtree.
-
-Краще ізолювати:
+Analytics або side effects від scroll краще робити через `snapshotFlow`:
 
 ```kotlin
-ScrollAwareToolbar(listState)
-HugeList(listState)
-```
-
-І всередині використовувати `derivedStateOf`.
-
-11. **Paging для великих списків**
-
-Якщо даних багато:
-
-```kotlin
-val items = viewModel.items.collectAsLazyPagingItems()
-
-LazyColumn {
-    items(items.itemCount) { index ->
-        val item = items[index]
-        if (item != null) {
-            ItemRow(item)
+LaunchedEffect(listState) {
+    snapshotFlow { listState.firstVisibleItemIndex }
+        .distinctUntilChanged()
+        .collect { index ->
+            analytics.trackScrollIndex(index)
         }
-    }
 }
 ```
 
-Paging не завантажує весь dataset одразу і зменшує pressure на memory/network.
+Не треба виконувати side effects прямо в body composable.
 
-12. **Не вкладати вертикальні lazy lists без потреби**
+11. **Уникати nested vertical lazy lists**
 
 Погано:
 
@@ -49808,138 +47744,60 @@ LazyColumn {
 }
 ```
 
-Вертикальний lazy всередині вертикального часто створює проблеми з constraints і performance.
-
-Краще flatten list:
+Краще flatten-ити структуру в один список:
 
 ```kotlin
 LazyColumn {
-    items(flattenedItems, key = { it.id }) { item ->
+    items(feedItems, key = { it.id }) { item ->
         FeedItem(item)
     }
 }
 ```
 
-13. **Не використовувати Column для великих списків**
+Горизонтальний `LazyRow` всередині вертикального `LazyColumn` — нормальний сценарій, але vertical-in-vertical часто створює проблеми.
 
-Погано:
-
-```kotlin
-Column {
-    users.forEach { user ->
-        UserItem(user)
-    }
-}
-```
-
-Краще:
+12. **Paging для великих remote списків**
 
 ```kotlin
+val users = viewModel.users.collectAsLazyPagingItems()
+
 LazyColumn {
-    items(users, key = { it.id }) { user ->
-        UserItem(user)
+    items(users.itemCount) { index ->
+        users[index]?.let { user ->
+            UserItem(user)
+        }
     }
 }
 ```
 
-14. **Стабільні callbacks**
+Paging зменшує memory/network pressure і не тримає весь dataset одразу.
 
-Не завжди проблема, але для великих списків важливо не створювати зайву складну логіку в item:
+13. **Профілювати конкретну причину jank**
 
-```kotlin
-UserItem(
-    user = user,
-    onClick = { onUserClick(user.id) }
-)
-```
-
-Якщо є performance issue, можна передати callback вище:
-
-```kotlin
-UserItem(
-    user = user,
-    onUserClick = onUserClick
-)
-```
-
-І викликати всередині:
-
-```kotlin
-Modifier.clickable {
-    onUserClick(user.id)
-}
-```
-
-15. **Не запускати side effects у item без ключів**
-
-Погано:
-
-```kotlin
-LaunchedEffect(Unit) {
-    analytics.trackItemVisible(item.id)
-}
-```
-
-У lazy list item може виходити/заходити в composition. Треба чітко розуміти ключ:
-
-```kotlin
-LaunchedEffect(item.id) {
-    analytics.trackItemVisible(item.id)
-}
-```
-
-А для visibility tracking краще використовувати listState + snapshotFlow.
-
-16. **snapshotFlow для scroll events**
-
-```kotlin
-LaunchedEffect(listState) {
-    snapshotFlow { listState.firstVisibleItemIndex }
-        .distinctUntilChanged()
-        .collect { index ->
-            analytics.trackScrollIndex(index)
-        }
-}
-```
-
-Так scroll state обробляється в Flow, а не викликає зайву логіку в composable body.
-
-17. **Профілювання**
-
-Не оптимізувати наосліп. Використовувати:
+Дивитися:
 
 - Layout Inspector recomposition counters;
-- Compose compiler metrics/reports;
 - Android Studio Profiler;
 - System Trace;
 - Macrobenchmark;
-- baseline profiles.
+- image loading/cache metrics;
+- allocations на scroll.
 
-Потрібно знайти, що саме дає jank: recomposition, layout, draw, image loading, allocation або main thread blocking.
+Причина може бути не в recomposition, а в image decode, layout, draw, GC або blocking work на main thread.
 
-18. **Типові помилки**
+14. **Практичне правило**
 
-- Сортувати/фільтрувати список у composable на кожну recomposition.
-- Не ставити `key` у LazyColumn.
-- Передавати mutable models.
-- Завантажувати images без cache/size constraints.
-- Робити nested vertical lazy lists.
-- Читати scroll state у великому parent composable.
-- Створювати expensive objects у item.
-- Виконувати blocking work на main thread.
-
-19. **Практичне правило**
-
-- Lazy lists з `key` і `contentType`.
-- Immutable UI models.
-- Heavy calculations — у ViewModel або `remember`.
-- Images — через нормальний loader і фіксовані розміри.
-- Scroll-derived UI — через `derivedStateOf`.
+- `LazyColumn`/`LazyRow` замість `Column` для великих списків.
+- `key` для dynamic lists.
+- `contentType` для mixed lists.
+- Immutable UI models і snapshots.
+- Heavy work — у ViewModel або `remember` з правильними keys.
+- Images — з cache і фіксованими розмірами.
+- Scroll-derived state — через `derivedStateOf`.
 - Scroll side effects — через `snapshotFlow`.
-- Великі списки — Paging.
 - Спочатку профілювати, потім оптимізувати.
 
-**Коротко:** лаги в Compose під час скролу зазвичай виникають через важкий item content, нестабільні дані, зайві recompositions, images або неправильні lazy list keys. Оптимізація — це stable models, lazy keys/contentType, легкий bind/composition, кешування обчислень і профілювання.
+**Коротко:** щоб уникнути лагів у Compose під час скролу, item має бути легким, дані — stable/immutable, lazy list — з `key` і за потреби `contentType`, images — оптимізовані, а scroll-derived логіка — винесена в `derivedStateOf` або `snapshotFlow`.
 
 </details>
 <details>
