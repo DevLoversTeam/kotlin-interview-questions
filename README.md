@@ -18543,11 +18543,11 @@ Singleton не підходить, якщо:
 
 #### Kotlin
 
-Generics — це механізм параметризації типів. Вони дозволяють писати класи, інтерфейси й функції, які працюють з різними типами, але зберігають type safety на етапі компіляції. У Kotlin generics широко використовуються в колекціях, `Result`, repositories, adapters, use cases, flows.
+Generics — це механізм параметризації типів. Вони дозволяють писати класи, інтерфейси й функції, які працюють з різними типами, але зберігають type safety на етапі компіляції.
 
 1. **Базова ідея**
 
-Замість того щоб писати окремий контейнер для кожного типу:
+Замість окремих контейнерів для кожного типу:
 
 ```kotlin
 class StringBox(val value: String)
@@ -18569,7 +18569,7 @@ val stringBox = Box("Hello")
 val intBox = Box(42)
 ```
 
-Тут `T` — type parameter.
+`T` — це type parameter.
 
 2. **Type safety**
 
@@ -18583,7 +18583,7 @@ val names: List<String> = listOf("Alex", "Kate")
 val firstName: String = names.first()
 ```
 
-І не дозволить додати неправильний тип у mutable collection:
+І не дозволить додати неправильний тип:
 
 ```kotlin
 val names = mutableListOf<String>()
@@ -18598,8 +18598,6 @@ fun <T> singleItemList(item: T): List<T> {
     return listOf(item)
 }
 ```
-
-Використання:
 
 ```kotlin
 val users: List<User> = singleItemList(User("1", "Alex"))
@@ -18620,8 +18618,6 @@ sealed interface Result<out T> {
 }
 ```
 
-Використання:
-
 ```kotlin
 val userResult: Result<User> = Result.Success(user)
 val postsResult: Result<List<Post>> = Result.Success(posts)
@@ -18639,21 +18635,11 @@ interface CrudRepository<ID, Entity> {
 }
 ```
 
-Реалізація:
-
 ```kotlin
 class UserRepository : CrudRepository<String, User> {
-    override suspend fun get(id: String): User {
-        TODO()
-    }
-
-    override suspend fun save(entity: User) {
-        TODO()
-    }
-
-    override suspend fun delete(id: String) {
-        TODO()
-    }
+    override suspend fun get(id: String): User = TODO()
+    override suspend fun save(entity: User) = TODO()
+    override suspend fun delete(id: String) = TODO()
 }
 ```
 
@@ -18676,9 +18662,9 @@ fun <T : Identifiable> findById(
 }
 ```
 
-Тепер `T` має бути типом, який реалізує `Identifiable`.
+`T` має бути типом, який реалізує `Identifiable`.
 
-7. **Multiple bounds**
+Multiple bounds:
 
 ```kotlin
 fun <T> sync(item: T)
@@ -18688,19 +18674,15 @@ fun <T> sync(item: T)
 }
 ```
 
-Це корисно, коли generic type має відповідати кільком contract-ам.
+7. **Variance: out**
 
-8. **Variance: out**
-
-`out` означає, що generic type тільки “виробляється” назовні.
+`out` означає, що generic type тільки “виробляється” назовні:
 
 ```kotlin
 interface Producer<out T> {
     fun produce(): T
 }
 ```
-
-Приклад:
 
 ```kotlin
 val stringProducer: Producer<String> = TODO()
@@ -18709,9 +18691,9 @@ val anyProducer: Producer<Any> = stringProducer
 
 Це безпечно, бо producer тільки повертає `T`.
 
-9. **Variance: in**
+8. **Variance: in**
 
-`in` означає, що generic type тільки “споживається”.
+`in` означає, що generic type тільки “споживається”:
 
 ```kotlin
 interface Consumer<in T> {
@@ -18719,16 +18701,14 @@ interface Consumer<in T> {
 }
 ```
 
-Приклад:
-
 ```kotlin
 val anyConsumer: Consumer<Any> = TODO()
 val stringConsumer: Consumer<String> = anyConsumer
 ```
 
-Це безпечно, бо consumer, який уміє приймати `Any`, точно може прийняти `String`.
+Consumer, який уміє приймати `Any`, точно може прийняти `String`.
 
-10. **Generics у Flow**
+9. **Generics у Flow**
 
 ```kotlin
 fun observeUser(): Flow<User>
@@ -18737,15 +18717,7 @@ fun observePosts(): Flow<List<Post>>
 
 `Flow<T>` — generic stream, який emit-ить значення типу `T`.
 
-У ViewModel:
-
-```kotlin
-val state: StateFlow<ProfileUiState>
-```
-
-Compose знає конкретний тип state.
-
-11. **Reified type parameters**
+10. **Reified type parameters**
 
 Через type erasure generic type зазвичай недоступний у runtime. Але inline-функції можуть мати `reified`:
 
@@ -18755,51 +18727,22 @@ inline fun <reified T> Json.decode(json: String): T {
 }
 ```
 
-Використання:
-
 ```kotlin
 val user: User = json.decode<User>(rawJson)
 ```
 
 `reified` дозволяє звертатися до `T::class` всередині inline-функції.
 
-12. **Типові помилки**
-
-Погано:
-
-```kotlin
-fun handle(items: List<Any>) {}
-```
-
-і очікувати, що можна передати `List<String>` завжди без наслідків. Треба розуміти variance.
-
-Краще:
-
-```kotlin
-fun handle(items: List<*>) {}
-```
-
-якщо тип елементів не важливий.
-
-Або:
-
-```kotlin
-fun <T> handle(items: List<T>) {}
-```
-
-якщо треба зберегти тип.
-
-13. **Практичне правило**
+11. **Практичне правило**
 
 - Generics використовують для reusable type-safe API.
 - `T` — type parameter, який підставляється конкретним типом.
 - Для producer-ів використовувати `out`.
 - Для consumer-ів використовувати `in`.
-- Для runtime-доступу до типу в Kotlin використовувати `inline reified`.
+- Для runtime-доступу до типу — `inline reified`.
 - Не робити generic API надто абстрактним без потреби.
-- Якщо generic ускладнює читання більше, ніж дає користі, краще простіший тип.
 
-**Коротко:** generics дозволяють писати один код для різних типів без втрати type safety. В Kotlin вони особливо важливі для колекцій, `Flow`, `Result`, repositories, mappers і reusable architecture contracts.
+**Коротко:** generics дозволяють писати один код для різних типів без втрати type safety. В Kotlin вони важливі для колекцій, `Flow`, `Result`, repositories, mappers і reusable architecture contracts.
 
 </details>
 <details>
@@ -26089,7 +26032,7 @@ Custom `ViewGroup` пишуть рідко. У більшості випадкі
 
 #### Kotlin
 
-`onStart()` — це lifecycle callback `Activity`, який викликається, коли Activity стає видимою користувачу, але ще не обовʼязково готова до взаємодії. Він іде після `onCreate()` або після повернення з `onStop()`, і перед `onResume()`. Практично `onStart()` використовують для запуску роботи, яка потрібна, поки екран видимий.
+`onStart()` — це lifecycle callback `Activity`, який викликається, коли Activity стає видимою користувачу, але ще не обовʼязково готова до взаємодії. Він іде після `onCreate()` або після повернення з `onStop()`, і перед `onResume()`.
 
 1. **Місце onStart у lifecycle**
 
@@ -26116,7 +26059,7 @@ onStart()
 onResume()
 ```
 
-Тобто `onStart()` може викликатися багато разів за життя однієї Activity.
+`onStart()` може викликатися багато разів за життя однієї Activity.
 
 2. **Activity стає видимою**
 
@@ -26138,7 +26081,7 @@ onStart  -> Activity видима
 onResume -> Activity на передньому плані і готова до interaction
 ```
 
-Activity може бути visible, але ще не resumed. Наприклад, коли поверх неї є partially transparent Activity або system transition.
+Activity може бути visible, але ще не resumed, наприклад коли поверх є partially transparent Activity або system transition.
 
 4. **Що доречно робити в onStart**
 
@@ -26146,11 +26089,9 @@ Activity може бути visible, але ще не resumed. Наприклад
 
 - підписуватися на visible-only listeners;
 - стартувати lightweight UI updates;
-- реєструвати receivers, які потрібні тільки коли екран видимий;
+- реєструвати receivers, потрібні тільки коли екран видимий;
 - запускати lifecycle-aware collection;
 - повідомляти analytics, що screen став visible.
-
-Приклад:
 
 ```kotlin
 override fun onStart() {
@@ -26184,7 +26125,7 @@ override fun onStop() {
 
 6. **Lifecycle-aware collection**
 
-Для Flow краще не вручну стартувати/зупиняти collect, а використовувати `repeatOnLifecycle`:
+Для `Flow` краще використовувати `repeatOnLifecycle`:
 
 ```kotlin
 override fun onCreate(savedInstanceState: Bundle?) {
@@ -26200,19 +26141,11 @@ override fun onCreate(savedInstanceState: Bundle?) {
 }
 ```
 
-Цей блок буде активний між `onStart()` і `onStop()`.
+Цей блок активний між `onStart()` і `onStop()`.
 
-7. **Чому STARTED часто краще за RESUMED**
+7. **STARTED vs RESUMED**
 
-Для UI state collection часто достатньо `STARTED`:
-
-```kotlin
-repeatOnLifecycle(Lifecycle.State.STARTED) {
-    viewModel.state.collect(::render)
-}
-```
-
-Екран уже видимий, тому state можна рендерити. `RESUMED` потрібен, коли робота має йти тільки при активній взаємодії користувача.
+Для UI state collection часто достатньо `STARTED`, бо екран уже видимий. `RESUMED` потрібен, коли робота має йти тільки при активній взаємодії користувача.
 
 8. **Що не треба робити в onStart**
 
@@ -26227,7 +26160,7 @@ override fun onStart() {
 
 `onStart()` виконується на main thread. Довга робота може заблокувати UI і привести до ANR.
 
-Краще:
+Краще делегувати роботу у ViewModel:
 
 ```kotlin
 override fun onStart() {
@@ -26236,30 +26169,9 @@ override fun onStart() {
 }
 ```
 
-А у ViewModel:
+9. **Resources і повторні виклики**
 
-```kotlin
-fun loadIfNeeded() {
-    viewModelScope.launch {
-        repository.load()
-    }
-}
-```
-
-9. **onStart після configuration change**
-
-При rotation Activity може бути перестворена:
-
-```text
-old Activity: onPause -> onStop -> onDestroy
-new Activity: onCreate -> onStart -> onResume
-```
-
-Тому код в `onStart()` має бути idempotent: повторний виклик не має ламати стан або дублювати підписки.
-
-10. **onStart і resources**
-
-Якщо ресурс потрібен тільки поки Activity видима, стартувати його можна в `onStart()`, а зупиняти в `onStop()`:
+Якщо ресурс потрібен, поки Activity видима, стартувати його можна в `onStart()`, а зупиняти в `onStop()`:
 
 ```kotlin
 override fun onStart() {
@@ -26273,19 +26185,11 @@ override fun onStop() {
 }
 ```
 
-Якщо ресурс потрібен тільки при активній взаємодії, краще `onResume()`/`onPause()`.
+Код в `onStart()` має бути idempotent: повторний виклик не має дублювати підписки або ламати стан.
 
-11. **onStart у Fragment**
+10. **Fragment нюанс**
 
-У Fragment теж є `onStart()`, але треба памʼятати про view lifecycle:
-
-```kotlin
-override fun onStart() {
-    super.onStart()
-}
-```
-
-Для UI Flow collection у Fragment краще:
+Для UI Flow collection у Fragment краще використовувати `viewLifecycleOwner`:
 
 ```kotlin
 viewLifecycleOwner.lifecycleScope.launch {
@@ -26295,19 +26199,9 @@ viewLifecycleOwner.lifecycleScope.launch {
 }
 ```
 
-Не `lifecycleScope`, а саме `viewLifecycleOwner.lifecycleScope`, якщо робота привʼязана до View.
+Якщо робота привʼязана до View, не треба використовувати Fragment `lifecycleScope`.
 
-12. **Практичне правило**
-
-- `onStart()` — Activity стала видимою.
-- Парний callback — `onStop()`.
-- Реєструвати visible-only ресурси в `onStart()`.
-- Звільняти їх у `onStop()`.
-- Для Flow використовувати `repeatOnLifecycle(STARTED)`.
-- Не виконувати blocking work у `onStart()`.
-- Код має бути безпечний до повторних викликів.
-
-**Коротко:** `onStart()` потрібен для запуску логіки, актуальної поки Activity видима. Це правильне місце для visible lifecycle subscriptions і lightweight setup, але не для довгої синхронної роботи.
+**Коротко:** `onStart()` потрібен для запуску логіки, актуальної поки Activity видима. Парний cleanup робиться в `onStop()`. Це хороше місце для visible subscriptions і lightweight setup, але не для довгої синхронної роботи.
 
 </details>
 <details>
