@@ -12053,10 +12053,7 @@ factory і constructor injection. Це прибирає ручні factories, р
 
 #### Kotlin
 
-`@Inject` — це анотація з JSR-330, яку використовують Dagger/Hilt, щоб позначити
-місце, де dependency треба створити або куди її треба передати. У Android/Hilt
-найчастіше `@Inject` ставлять на constructor класу, щоб Hilt знав, як створити
-цей клас і які залежності йому потрібні.
+`@Inject` — це анотація з JSR-330, яку використовують Dagger/Hilt, щоб позначити, як створити dependency або куди її передати. В Android/Hilt найчастіше `@Inject` ставлять на constructor класу.
 
 1. **Constructor injection**
 
@@ -12072,12 +12069,9 @@ class LoadUserUseCase @Inject constructor(
 }
 ```
 
-Тут `@Inject constructor` означає: Hilt може створити `LoadUserUseCase`, якщо в
-dependency graph є `UserRepository`.
+`@Inject constructor` означає: Hilt може створити `LoadUserUseCase`, якщо в dependency graph є `UserRepository`.
 
 2. **Як Hilt читає constructor**
-
-Для такого класу:
 
 ```kotlin
 class UserViewModel @Inject constructor(
@@ -12109,15 +12103,7 @@ class MainActivity : AppCompatActivity() {
 }
 ```
 
-Hilt заповнить `analytics` після створення Activity.
-
-Але для власних класів краще constructor injection. Field injection здебільшого
-потрібен для Android framework classes, які система створює сама:
-
-- `Activity`;
-- `Fragment`;
-- `Service`;
-- `BroadcastReceiver`.
+Field injection здебільшого потрібен для Android framework classes, які створює система: `Activity`, `Fragment`, `Service`, `BroadcastReceiver`. Для власних класів краще constructor injection.
 
 4. **Method injection**
 
@@ -12125,7 +12111,6 @@ Hilt заповнить `analytics` після створення Activity.
 
 ```kotlin
 class Tracker {
-
     lateinit var analytics: Analytics
 
     @Inject
@@ -12135,12 +12120,11 @@ class Tracker {
 }
 ```
 
-У production Android-коді це використовується рідко. Constructor injection
-зазвичай простіший, явніший і тестованіший.
+У production Android-коді це рідко потрібно. Constructor injection простіший і тестованіший.
 
 5. **@Inject не створює interface автоматично**
 
-Якщо є interface:
+Якщо залежність запитується як interface:
 
 ```kotlin
 interface UserRepository {
@@ -12148,15 +12132,13 @@ interface UserRepository {
 }
 ```
 
-Hilt не знає, яку реалізацію вибрати. Треба явно привʼязати implementation:
+Hilt не знає, яку реалізацію вибрати. Потрібен binding:
 
 ```kotlin
 class RealUserRepository @Inject constructor(
     private val api: UserApi
 ) : UserRepository
 ```
-
-Module:
 
 ```kotlin
 @Module
@@ -12170,18 +12152,11 @@ abstract class RepositoryModule {
 }
 ```
 
-`@Inject` на constructor implementation недостатньо, якщо dependency запитується
-як interface.
+`@Inject` на constructor implementation недостатньо, якщо caller просить interface.
 
-6. **@Inject не працює для third-party класів**
+6. **Third-party залежності**
 
-Не можна додати `@Inject constructor` у клас, який ти не контролюєш:
-
-```kotlin
-Retrofit
-OkHttpClient
-RoomDatabase
-```
+Не можна додати `@Inject constructor` у клас, який ти не контролюєш: `Retrofit`, `OkHttpClient`, `RoomDatabase`.
 
 Для таких залежностей використовують `@Provides`:
 
@@ -12197,17 +12172,14 @@ object NetworkModule {
 }
 ```
 
-7. **@Inject і scopes**
+7. **Scopes**
 
-`@Inject` каже, як створити клас, але не завжди каже, скільки має жити instance.
-Для lifecycle використовують scopes:
+`@Inject` каже, як створити клас, але не завжди каже, скільки має жити instance. Для lifecycle використовують scopes:
 
 ```kotlin
 @Singleton
 class UserSession @Inject constructor()
 ```
-
-Або:
 
 ```kotlin
 @ViewModelScoped
@@ -12216,7 +12188,7 @@ class UserDraftCache @Inject constructor()
 
 Без scope Hilt може створювати новий instance там, де це потрібно graph-у.
 
-8. **@Inject і qualifiers**
+8. **Qualifiers**
 
 Якщо є кілька залежностей одного типу:
 
@@ -12230,7 +12202,7 @@ fun provideAuthRetrofit(): Retrofit = TODO()
 fun providePublicRetrofit(): Retrofit = TODO()
 ```
 
-Тоді в constructor треба вказати qualifier:
+У constructor треба вказати qualifier:
 
 ```kotlin
 class AuthApi @Inject constructor(
@@ -12240,9 +12212,9 @@ class AuthApi @Inject constructor(
 
 Без qualifier Hilt не знатиме, який `Retrofit` передати.
 
-9. **Що відбувається на compile time**
+9. **Compile-time graph**
 
-Hilt/Dagger через annotation processing/code generation:
+Hilt/Dagger через code generation:
 
 - знаходить `@Inject constructor`;
 - знаходить `@Module`, `@Provides`, `@Binds`;
@@ -12252,16 +12224,7 @@ Hilt/Dagger через annotation processing/code generation:
 
 Якщо graph неповний, помилка буде під час компіляції, а не в runtime.
 
-10. **Типові помилки**
-
-- Ставити `@Inject` на implementation, але не зробити `@Binds` для interface.
-- Використовувати field injection там, де можна constructor injection.
-- Забути qualifier, коли є кілька залежностей одного типу.
-- Очікувати, що Hilt сам створить third-party dependency без `@Provides`.
-- Інжектити Android `Activity`/`View` у long-lived обʼєкти.
-- Додавати scope без розуміння lifecycle.
-
-11. **Практичне правило**
+10. **Практичне правило**
 
 - Для своїх класів — `@Inject constructor`.
 - Для Android framework classes — field injection, якщо потрібно.
@@ -12270,9 +12233,7 @@ Hilt/Dagger через annotation processing/code generation:
 - Для кількох однакових типів — qualifiers.
 - Для lifecycle/reuse — scopes.
 
-**Коротко:** `@Inject` показує Hilt/Dagger, як створити обʼєкт або куди передати
-dependency. Найкраща практика — constructor injection, бо вона робить
-залежності явними, compile-time перевіреними і простими для тестування.
+**Коротко:** `@Inject` показує Hilt/Dagger, як створити обʼєкт або куди передати dependency. Найкраща практика — constructor injection, бо вона робить залежності явними, compile-time перевіреними і простими для тестування.
 
 </details>
 <details>
