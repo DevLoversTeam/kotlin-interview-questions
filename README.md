@@ -22454,11 +22454,11 @@ least privilege
 
 #### Kotlin
 
-Authentication і authorization — це різні частини security flow. Authentication відповідає на питання “хто ти?”, а authorization — “що тобі дозволено робити?”. Спочатку система ідентифікує користувача, потім перевіряє його права доступу.
+`Authentication` і `authorization` — це різні частини security flow. Authentication відповідає на питання “хто ти?”, authorization — “що тобі дозволено робити?”. Спочатку система ідентифікує користувача, потім перевіряє його права.
 
 1. **Authentication**
 
-Authentication — це процес підтвердження особи користувача.
+Authentication — це підтвердження особи користувача.
 
 Приклади:
 
@@ -22480,7 +22480,7 @@ interface AuthApi {
 }
 ```
 
-Після успішної authentication backend видає tokens:
+Після успішної authentication backend зазвичай видає tokens:
 
 ```kotlin
 data class AuthTokens(
@@ -22506,7 +22506,7 @@ Backend може відповісти:
 403 Forbidden
 ```
 
-Тобто користувача впізнали, але дія заборонена.
+Користувача впізнали, але дія заборонена.
 
 3. **Коротка різниця**
 
@@ -22515,14 +22515,14 @@ Authentication -> хто користувач?
 Authorization  -> що цьому користувачу дозволено?
 ```
 
-Приклад:
+HTTP-коди:
 
 ```text
 401 Unauthorized -> користувач не authenticated або token невалідний
 403 Forbidden    -> користувач authenticated, але не має permission
 ```
 
-Назва `401 Unauthorized` історично трохи плутає, але на практиці це саме проблема authentication.
+Назва `401 Unauthorized` історично плутає, але практично це authentication problem.
 
 4. **Приклад в Android**
 
@@ -22532,10 +22532,7 @@ Authentication:
 class LoginUseCase(
     private val authRepository: AuthRepository
 ) {
-    suspend operator fun invoke(
-        email: String,
-        password: String
-    ): LoginResult {
+    suspend operator fun invoke(email: String, password: String): LoginResult {
         return authRepository.login(email, password)
     }
 }
@@ -22545,8 +22542,8 @@ Authorization:
 
 ```kotlin
 class DeleteUserUseCase(
-    private val userRepository: UserRepository,
-    private val permissionChecker: PermissionChecker
+    private val permissionChecker: PermissionChecker,
+    private val userRepository: UserRepository
 ) {
     suspend operator fun invoke(userId: String): DeleteUserResult {
         if (!permissionChecker.canDeleteUsers()) {
@@ -22559,9 +22556,9 @@ class DeleteUserUseCase(
 }
 ```
 
-5. **Access token і authentication**
+5. **Access token**
 
-Access token часто підтверджує, що користувач authenticated:
+Access token зазвичай додають до request через interceptor:
 
 ```kotlin
 class AuthInterceptor(
@@ -22569,9 +22566,7 @@ class AuthInterceptor(
 ) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val token = tokenStorage.getAccessToken()
-
-        val request = chain.request()
-            .newBuilder()
+        val request = chain.request().newBuilder()
             .apply {
                 if (token != null) {
                     header("Authorization", "Bearer $token")
@@ -22604,12 +22599,7 @@ enum class Permission {
 }
 ```
 
-Роль може давати набір permissions:
-
-```text
-ADMIN -> READ_PROFILE, EDIT_PROFILE, DELETE_USER
-USER  -> READ_PROFILE, EDIT_PROFILE
-```
+Роль може давати набір permissions, але source of truth має бути на backend.
 
 7. **Не довіряти тільки клієнту**
 
@@ -22623,13 +22613,9 @@ if (state.canDeleteUser) {
 }
 ```
 
-Але це тільки UX. Справжню authorization має перевіряти backend.
+Але це тільки UX. Справжню authorization має перевіряти backend, бо mobile app можна модифікувати або викликати API напряму.
 
-Причина: mobile app можна модифікувати, reverse engineer-ити або викликати API напряму.
-
-8. **401 vs 403**
-
-Обробка в app:
+8. **Обробка 401 і 403**
 
 ```kotlin
 fun Throwable.toAppError(): AppError {
@@ -22644,57 +22630,16 @@ fun Throwable.toAppError(): AppError {
 }
 ```
 
-UI:
+Для `401` app зазвичай робить refresh token або веде на login. Для `403` показує “немає доступу”.
 
-```kotlin
-when (error) {
-    AppError.Unauthenticated -> showLoginScreen()
-    AppError.Forbidden -> showNoAccessMessage()
-    else -> showGenericError()
-}
-```
-
-9. **Session expiration**
-
-Якщо access token expired:
-
-```text
-API -> 401 -> refresh token -> retry request
-```
-
-Якщо refresh token теж invalid:
-
-```text
-logout -> clear tokens -> navigate to login
-```
-
-Це authentication problem, не authorization.
-
-10. **Приклади**
-
-Authentication examples:
-
-- користувач ввів password;
-- app отримав OAuth code;
-- backend видав JWT;
-- app refresh-нув access token.
-
-Authorization examples:
-
-- user може бачити тільки свої orders;
-- moderator може блокувати comments;
-- admin може видаляти users;
-- free user не має доступу до premium feature.
-
-11. **Практичне правило**
+9. **Практичне правило**
 
 - Authentication завжди перед authorization.
 - Access token підтверджує identity/session.
-- Permissions/roles визначають доступ.
-- `401` — треба login/refresh token.
-- `403` — authenticated, але доступ заборонено.
+- Roles/permissions визначають доступ.
+- `401` — login або refresh token.
+- `403` — користувач відомий, але дія заборонена.
 - UI може ховати недоступні дії, але backend має перевіряти права.
-- Не зберігати permissions як єдине джерело правди тільки на клієнті.
 
 **Коротко:** authentication підтверджує особу користувача, authorization перевіряє його права. В Android app ми зберігаємо й додаємо токен до запитів, але остаточна перевірка доступу має бути на backend.
 
