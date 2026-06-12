@@ -7078,10 +7078,7 @@ continuation.resumeWithException(error)
 
 #### Kotlin
 
-`Channel` і `Flow` обидва можуть передавати значення між корутинами, але мають
-різну модель. `Channel` — це coroutine primitive для комунікації між
-producer-ом і consumer-ом. `Flow` — це декларативний stream API для асинхронних
-послідовностей даних.
+`Channel` і `Flow` обидва можуть передавати значення між корутинами, але мають різну модель. `Channel` — це coroutine primitive для комунікації між producer-ом і consumer-ом. `Flow` — декларативний stream API для асинхронних послідовностей даних.
 
 1. **Channel**
 
@@ -7103,8 +7100,7 @@ launch {
 }
 ```
 
-Producer відправляє значення через `send`, consumer отримує через `receive` або
-`for (value in channel)`.
+Producer відправляє значення через `send`, consumer отримує через `receive` або `for (value in channel)`.
 
 2. **Flow**
 
@@ -7121,12 +7117,11 @@ numbers().collect { value ->
 }
 ```
 
-`Flow` краще підходить для data pipeline: трансформації, фільтрація,
-комбінування, обробка помилок, dispatcher control.
+`Flow` краще підходить для data pipeline: трансформації, фільтрація, комбінування, обробка помилок, dispatcher control.
 
 3. **Push vs declarative pipeline**
 
-`Channel` — більш низькорівневий push-based механізм:
+`Channel` — низькорівневий push-based механізм:
 
 ```kotlin
 channel.send(event)
@@ -7134,7 +7129,7 @@ channel.send(event)
 
 Ти явно керуєш відправкою, закриттям, buffering і receiving.
 
-`Flow` — декларативний:
+`Flow` — декларативний pipeline:
 
 ```kotlin
 repository.observeUsers()
@@ -7143,7 +7138,7 @@ repository.observeUsers()
     .collect { users -> render(users) }
 ```
 
-Тут ти описуєш, як дані мають пройти через pipeline.
+Тут описано, як дані проходять через pipeline.
 
 4. **Cold/Hot модель**
 
@@ -7157,28 +7152,26 @@ val flow = flow {
 
 Він стартує при `collect`.
 
-`Channel` — hot primitive. Якщо producer відправляє дані, вони йдуть у channel
-незалежно від того, як ти описав pipeline. Якщо consumer не читає, поведінка
-залежить від buffer capacity.
+`Channel` — hot primitive. Producer може відправляти дані незалежно від того, чи consumer вже читає. Якщо consumer не читає, поведінка залежить від buffer capacity.
 
 5. **Backpressure**
 
-У `Channel` backpressure проявляється напряму:
+У `Channel` backpressure контролюється capacity:
 
 ```kotlin
 val channel = Channel<Int>(capacity = 0)
 
-channel.send(1) // може suspend-итись, поки consumer не прийме значення
+channel.send(1) // suspend until receiver receives value
 ```
 
-Capacity впливає на поведінку:
+Варіанти:
 
-- `RENDEZVOUS`/`0` — send чекає receive;
+- `RENDEZVOUS`/`0` — `send` чекає `receive`;
 - `BUFFERED` — є буфер;
-- `CONFLATED` — зберігається тільки останнє значення;
+- `CONFLATED` — зберігається останнє значення;
 - `UNLIMITED` — необмежений буфер, небезпечно без контролю.
 
-У `Flow` backpressure зазвичай керується операторно:
+У `Flow` backpressure зазвичай керується операторами:
 
 ```kotlin
 flow
@@ -7191,7 +7184,7 @@ flow
 
 6. **Коли використовувати Channel**
 
-`Channel` доречний, коли потрібна coroutine-to-coroutine комунікація:
+`Channel` доречний для coroutine-to-coroutine комунікації:
 
 - worker queue;
 - actor-like модель;
@@ -7199,8 +7192,6 @@ flow
 - ручне керування producer/consumer;
 - одноразова передача задач між корутинами;
 - низькорівнева синхронізація.
-
-Приклад worker queue:
 
 ```kotlin
 val tasks = Channel<Task>(capacity = Channel.BUFFERED)
@@ -7218,7 +7209,7 @@ tasks.send(Task.SyncUser)
 
 7. **Коли використовувати Flow**
 
-`Flow` доречний для stream-ів даних у application architecture:
+`Flow` доречний для stream-ів даних в application architecture:
 
 - repository streams;
 - database observations;
@@ -7238,8 +7229,7 @@ fun observeScreenState(): Flow<UiState> =
     }
 ```
 
-Для більшості application-level stream-ів `Flow` краще, ніж `Channel`, бо API
-вище рівнем і безпечніший для composition.
+Для більшості application-level stream-ів `Flow` краще за `Channel`.
 
 8. **Channel.receiveAsFlow**
 
@@ -7250,13 +7240,11 @@ val channel = Channel<UiEvent>()
 val events: Flow<UiEvent> = channel.receiveAsFlow()
 ```
 
-Але це треба робити обережно. `receiveAsFlow()` розподіляє значення між
-collectors, а не broadcast-ить кожне значення всім collectors. Якщо потрібен
-broadcast events, частіше краще `SharedFlow`.
+Важливий нюанс: `receiveAsFlow()` розподіляє значення між collectors, а не broadcast-ить кожне значення всім collectors. Якщо потрібен broadcast, частіше краще `SharedFlow`.
 
 9. **callbackFlow**
 
-`callbackFlow` всередині використовує channel-like API:
+`callbackFlow` ховає channel-like API всередині Flow:
 
 ```kotlin
 fun observeLocation(): Flow<Location> = callbackFlow {
@@ -7274,27 +7262,17 @@ fun observeLocation(): Flow<Location> = callbackFlow {
 }
 ```
 
-Ззовні це `Flow`, а всередині є bridge для callback API. Це хороший приклад:
-низькорівневу channel-модель ховаємо за зручним Flow API.
+Ззовні це `Flow`, а всередині bridge для callback API.
 
-10. **Типові помилки**
+10. **Практичне правило**
 
-- Використовувати `Channel` там, де достатньо `Flow`.
-- Забути закрити channel, якщо це потрібно.
-- Використовувати `Channel.UNLIMITED` без контролю memory growth.
-- Очікувати broadcast-поведінку від `receiveAsFlow`.
-- Передавати UI state через `Channel`, хоча краще `StateFlow`.
+- Data stream або reactive pipeline — `Flow`.
+- Низькорівнева черга між корутинами — `Channel`.
+- UI state — `StateFlow`, не `Channel`.
+- Broadcast events — `SharedFlow`, не `receiveAsFlow`.
+- Не використовувати `Channel.UNLIMITED` без контролю memory growth.
 
-11. **Практичне правило**
-
-Якщо ти будуєш data stream або reactive pipeline — використовуй `Flow`.
-Якщо тобі потрібна низькорівнева черга/комунікація між корутинами — використовуй
-`Channel`.
-
-**Коротко:** `Channel` — це асинхронна черга для coroutine communication. `Flow` —
-це декларативний stream API для значень у часі. У прикладному коді частіше
-краще починати з `Flow`, а `Channel` залишати для спеціальних producer-consumer
-сценаріїв.
+**Коротко:** `Channel` — це асинхронна черга для coroutine communication. `Flow` — декларативний stream API для значень у часі. У прикладному коді частіше краще починати з `Flow`, а `Channel` залишати для спеціальних producer-consumer сценаріїв.
 
 </details>
 <details>
@@ -11089,10 +11067,7 @@ Room підходить для local relational storage, offline-first cache, st
 
 #### Kotlin
 
-`@Query`, `@Insert` і `@Delete` — це Room-анотації для DAO-методів. Вони
-описують, яку SQL-операцію має виконати Room: довільний SQL-запит, вставку або
-видалення entity. На основі цих анотацій Room генерує implementation DAO і
-перевіряє SQL на compile time.
+`@Query`, `@Insert` і `@Delete` — це Room-анотації для DAO-методів. Вони описують, яку SQL-операцію має виконати Room: довільний SQL-запит, вставку або видалення entity. Room генерує implementation DAO і перевіряє SQL на compile time.
 
 1. **DAO як контракт**
 
@@ -11117,8 +11092,7 @@ interface UserDao {
 suspend fun getUser(id: String): UserEntity?
 ```
 
-`:id` — це bind parameter. Room підставить значення параметра методу `id` у SQL
-безпечним способом, без ручної конкатенації string.
+`:id` — це bind parameter. Room підставить значення безпечно, без ручної конкатенації string.
 
 Погано:
 
@@ -11126,27 +11100,16 @@ suspend fun getUser(id: String): UserEntity?
 @Query("SELECT * FROM users WHERE id = '$id'")
 ```
 
-Так не працює і концептуально небезпечно. Параметри треба передавати через
-`:parameterName`.
+Параметри треба передавати через `:parameterName`.
 
-3. **@Query для списків**
+3. **@Query для списків і Flow**
 
 ```kotlin
 @Query("SELECT * FROM users ORDER BY name")
 fun observeUsers(): Flow<List<UserEntity>>
 ```
 
-Room може повертати:
-
-- `List<T>`;
-- nullable entity;
-- `Flow<T>`;
-- `LiveData<T>`;
-- `PagingSource`;
-- `suspend` results.
-
-Якщо повертається `Flow`, Room буде емiтити нові значення при зміні відповідних
-таблиць.
+Room може повертати `List<T>`, nullable entity, `Flow<T>`, `LiveData<T>`, `PagingSource`, `suspend` results. Якщо повертається `Flow`, Room emit-ить нові значення при зміні відповідних таблиць.
 
 4. **@Query для UPDATE/DELETE**
 
@@ -11157,15 +11120,12 @@ Room може повертати:
 suspend fun updateUserName(id: String, name: String)
 ```
 
-або:
-
 ```kotlin
 @Query("DELETE FROM users WHERE id = :id")
 suspend fun deleteById(id: String)
 ```
 
-Це корисно, коли треба оновити або видалити не весь entity, а конкретні поля або
-рядки за умовою.
+Це корисно, коли треба оновити або видалити конкретні поля/рядки за умовою.
 
 5. **@Insert**
 
@@ -11200,19 +11160,16 @@ suspend fun insertUser(user: UserEntity)
 - `IGNORE` — ігнорувати новий рядок при conflict;
 - `ABORT` — перервати операцію з помилкою.
 
-Вибір strategy — це бізнес-рішення. `REPLACE` не завжди безпечний, бо фактично
-може видалити старий рядок і вставити новий.
+`REPLACE` не завжди безпечний, бо може фактично видалити старий рядок і вставити новий.
 
 7. **@Delete**
 
-`@Delete` видаляє entity:
+`@Delete` видаляє entity за primary key:
 
 ```kotlin
 @Delete
 suspend fun deleteUser(user: UserEntity)
 ```
-
-Room видаляє рядок за primary key entity.
 
 Для списку:
 
@@ -11221,7 +11178,7 @@ Room видаляє рядок за primary key entity.
 suspend fun deleteUsers(users: List<UserEntity>)
 ```
 
-Якщо треба видалити за `id`, без повного entity, краще `@Query`:
+Якщо треба видалити за `id` без повного entity, краще `@Query`:
 
 ```kotlin
 @Query("DELETE FROM users WHERE id = :id")
@@ -11237,13 +11194,6 @@ suspend fun deleteUserById(id: String)
 suspend fun insertUser(user: UserEntity): Long
 ```
 
-Для списку:
-
-```kotlin
-@Insert
-suspend fun insertUsers(users: List<UserEntity>): List<Long>
-```
-
 `@Delete` може повертати кількість видалених рядків:
 
 ```kotlin
@@ -11251,49 +11201,25 @@ suspend fun insertUsers(users: List<UserEntity>): List<Long>
 suspend fun deleteUser(user: UserEntity): Int
 ```
 
-`@Query` для update/delete теж може повертати кількість affected rows:
+`@Query` для update/delete теж може повертати affected rows:
 
 ```kotlin
 @Query("DELETE FROM users WHERE isArchived = 1")
 suspend fun deleteArchivedUsers(): Int
 ```
 
-9. **@Update**
+9. **@Update і @Transaction**
 
-Хоча питання про `@Query`, `@Insert`, `@Delete`, поруч часто використовують
-`@Update`:
+Поруч часто використовують `@Update`:
 
 ```kotlin
 @Update
 suspend fun updateUser(user: UserEntity)
 ```
 
-`@Update` оновлює рядок за primary key. Якщо треба оновити тільки одне поле,
-часто краще `@Query`.
+`@Update` оновлює рядок за primary key. Якщо треба оновити одне поле, частіше краще `@Query`.
 
-10. **Compile-time перевірка**
-
-Room перевіряє SQL:
-
-```kotlin
-@Query("SELECT wrong_column FROM users")
-suspend fun brokenQuery(): List<UserEntity>
-```
-
-Якщо column не існує або result не мапиться в return type, Room видасть помилку
-під час компіляції. Це одна з головних переваг Room над raw SQLite.
-
-11. **Transaction**
-
-Якщо DAO-метод має виконуватись атомарно:
-
-```kotlin
-@Transaction
-@Query("SELECT * FROM users WHERE id = :id")
-suspend fun getUserWithOrders(id: String): UserWithOrders
-```
-
-Для кількох write operations можна зробити method у DAO:
+Для атомарних multi-step operations використовують `@Transaction`:
 
 ```kotlin
 @Transaction
@@ -11303,18 +11229,18 @@ suspend fun replaceUsers(users: List<UserEntity>) {
 }
 ```
 
-12. **Практичне правило**
+10. **Compile-time перевірка**
 
-- `@Query` — довільний SQL: select, update, delete, custom operations.
-- `@Insert` — вставка entity/entities.
-- `@Delete` — видалення entity/entities за primary key.
-- Для delete/update за умовою частіше використовувати `@Query`.
-- Для conflict behavior явно задавати `OnConflictStrategy`.
-- Для складних multi-step operations використовувати `@Transaction`.
+Room перевіряє SQL під час компіляції:
 
-**Коротко:** ці анотації описують Room, яку database operation треба згенерувати.
-`@Query` дає контроль над SQL, `@Insert` генерує вставку entity, а `@Delete`
-видаляє entity за primary key з type-safe compile-time перевіркою.
+```kotlin
+@Query("SELECT wrong_column FROM users")
+suspend fun brokenQuery(): List<UserEntity>
+```
+
+Якщо column не існує або result не мапиться в return type, Room видасть compile-time помилку.
+
+**Коротко:** `@Query` дає контроль над SQL, `@Insert` генерує вставку entity, а `@Delete` видаляє entity за primary key. Room на основі цих анотацій генерує DAO implementation і перевіряє SQL на compile time.
 
 </details>
 <details>
@@ -15518,11 +15444,11 @@ val items = pager.collectAsLazyPagingItems()
 
 #### Kotlin
 
-`@Stable` і `@Immutable` у Compose — це анотації, які допомагають Compose compiler/runtime зрозуміти, наскільки безпечно пропускати recomposition для обʼєктів. `@Immutable` означає, що обʼєкт після створення не змінюється. `@Stable` означає, що обʼєкт може мати mutable state, але Compose може коректно відстежувати його зміни.
+`@Stable` і `@Immutable` у Compose допомагають compiler/runtime зрозуміти, чи можна безпечно skip-ати recomposition. `@Immutable` означає, що обʼєкт після створення не змінюється. `@Stable` означає, що обʼєкт може мати mutable state, але Compose може коректно відстежувати його зміни.
 
 1. **Навіщо вони потрібні**
 
-Compose намагається пропускати recomposition, якщо параметри composable не змінилися.
+Compose намагається пропускати recomposition, якщо параметри composable не змінилися:
 
 ```kotlin
 @Composable
@@ -15531,9 +15457,7 @@ fun UserCard(user: UserUiModel) {
 }
 ```
 
-Щоб безпечно skip-нути `UserCard`, Compose має розуміти стабільність `UserUiModel`.
-
-Якщо тип unstable, Compose може частіше recomposed composable, бо не може гарантувати, що всередині нічого не змінилося.
+Щоб безпечно skip-нути `UserCard`, Compose має розуміти стабільність `UserUiModel`. Якщо тип unstable, Compose може recomposed частіше.
 
 2. **@Immutable**
 
@@ -15548,12 +15472,12 @@ data class UserUiModel(
 )
 ```
 
-Це хороший UI model:
+Хороший immutable UI model:
 
-- всі поля `val`;
-- типи полів immutable або stable;
+- має `val` поля;
+- поля теж immutable/stable;
 - немає прихованої мутації;
-- значення змінюється через створення нового instance.
+- зміна робиться через новий instance.
 
 3. **Поганий @Immutable**
 
@@ -15567,15 +15491,13 @@ data class UserUiModel(
 )
 ```
 
-Це неправда. `MutableList` можна змінити після створення:
+`MutableList` можна змінити після створення:
 
 ```kotlin
 user.tags.add("new")
 ```
 
-Compose може вважати object immutable, але фактично він змінюється. Це може дати некоректний UI або missed recomposition.
-
-Краще:
+Compose може повірити анотації й пропустити потрібну recomposition. Краще:
 
 ```kotlin
 @Immutable
@@ -15591,9 +15513,9 @@ data class UserUiModel(
 
 `@Stable` означає, що тип має стабільну поведінку для Compose:
 
-- `equals` дає стабільний результат для тих самих значень;
-- зміни public properties будуть повідомлені Compose;
-- всі public property types теж stable.
+- `equals` стабільний для тих самих значень;
+- зміни public properties повідомляються Compose;
+- public property types теж stable.
 
 Приклад:
 
@@ -15604,7 +15526,7 @@ class CounterState {
 }
 ```
 
-Обʼєкт mutable, але Compose бачить зміни через `mutableStateOf`/`mutableIntStateOf`.
+Обʼєкт mutable, але Compose бачить зміни через Compose state.
 
 5. **Головна різниця**
 
@@ -15613,10 +15535,9 @@ class CounterState {
 @Stable    -> обʼєкт може змінюватися, але Compose знає, як це відстежити
 ```
 
-`@Immutable` — сильніша гарантія.  
-`@Stable` — слабша, але корисна для state holder-ів.
+`@Immutable` — сильніша гарантія. `@Stable` — слабша, але корисна для state holder-ів.
 
-6. **Приклад Stable state holder**
+6. **Stable state holder**
 
 ```kotlin
 @Stable
@@ -15632,7 +15553,7 @@ class SearchState {
 
 Такий клас може бути stable, бо зміна `query` проходить через Compose state.
 
-Але якщо зробити так:
+Погано:
 
 ```kotlin
 @Stable
@@ -15641,19 +15562,17 @@ class SearchState {
 }
 ```
 
-Compose не буде автоматично знати про зміну `query`. Це погана анотація.
+Compose не буде автоматично знати про зміну `query`.
 
 7. **Коли використовувати @Immutable**
 
-Використовувати для:
+Підходить для:
 
 - UI models;
 - value objects;
 - screen state data classes;
 - sealed state models;
 - DTO-to-UI mapped models, якщо вони реально immutable.
-
-Приклад:
 
 ```kotlin
 @Immutable
@@ -15666,14 +15585,12 @@ data class ProfileUiState(
 
 8. **Коли використовувати @Stable**
 
-Використовувати для:
+Підходить для:
 
 - custom state holders;
 - controller objects;
 - classes із Compose observable state;
-- обʼєктів, які мають mutable behavior, але контрольовано повідомляють Compose.
-
-Приклад:
+- обʼєктів із mutable behavior, який контрольовано повідомляє Compose.
 
 ```kotlin
 @Stable
@@ -15687,7 +15604,7 @@ class SnackbarController {
 }
 ```
 
-9. **Не використовувати анотації як “лікування” performance**
+9. **Не лікувати performance анотаціями**
 
 Погано:
 
@@ -15698,15 +15615,11 @@ class HugeMutableManager {
 }
 ```
 
-Це обман Compose compiler-а. Анотації — це contract. Якщо contract неправдивий, можна отримати missed recompositions і важкі bugs.
-
-Спочатку треба зробити модель реально immutable/stable, а не просто поставити annotation.
+Анотації — це contract. Якщо contract неправдивий, можна отримати missed recompositions і складні UI bugs.
 
 10. **Immutable collections**
 
-Звичайний `List<T>` у Kotlin — read-only interface, але не гарантує повну immutability underlying collection.
-
-Для суворішої гарантії можна використовувати persistent immutable collections:
+`List<T>` у Kotlin — read-only interface, але underlying collection може бути mutable. Для суворішої гарантії можна використовувати persistent immutable collections:
 
 ```kotlin
 import kotlinx.collections.immutable.ImmutableList
@@ -15717,8 +15630,6 @@ data class FeedUiState(
 )
 ```
 
-Це особливо корисно у великих Compose-проєктах.
-
 11. **Практичне правило**
 
 - Для data class UI state — переважно `@Immutable`.
@@ -15728,9 +15639,7 @@ data class FeedUiState(
 - Уникати `MutableList`, `MutableMap`, mutable public fields у UI state.
 - Краще створювати новий state object, ніж мутувати старий.
 
-12. **Коротко**
-
-`@Immutable` каже Compose: цей обʼєкт не зміниться після створення. `@Stable` каже: цей обʼєкт може змінюватися, але зміни відстежуються коректно. Обидві анотації впливають на можливість skip recomposition, але їх треба використовувати тільки коли модель реально відповідає contract-у.
+**Коротко:** `@Immutable` каже Compose, що обʼєкт не зміниться після створення. `@Stable` каже, що обʼєкт може змінюватися, але зміни відстежуються коректно. Обидві анотації треба використовувати тільки коли модель реально відповідає contract-у.
 
 </details>
 <details>
@@ -22220,7 +22129,7 @@ Retrofit — хороший default для REST API в Android. Але важл�
 
 #### Kotlin
 
-Apollo GraphQL, точніше Apollo Kotlin, — це GraphQL client для Kotlin/Android. Він генерує type-safe Kotlin-код із GraphQL schema та `.graphql` queries, дозволяє виконувати queries, mutations, subscriptions, працювати з cache і мінімізує ручний parsing JSON.
+Apollo GraphQL, точніше Apollo Kotlin, — це GraphQL client для Kotlin/Android. Він генерує type-safe Kotlin-код із GraphQL schema та `.graphql` queries, дозволяє виконувати queries, mutations, subscriptions і працювати з cache.
 
 1. **Що таке GraphQL**
 
@@ -22253,7 +22162,7 @@ Client отримує саме ті поля, які описав у query.
 
 2. **Apollo Kotlin**
 
-Apollo Kotlin бере `.graphql` файли:
+Apollo бере `.graphql` файли:
 
 ```graphql
 query GetUser($id: ID!) {
@@ -22275,7 +22184,7 @@ GetUserQuery.User
 
 Це дає type safety на етапі компіляції.
 
-3. **Створення ApolloClient**
+3. **ApolloClient**
 
 ```kotlin
 val apolloClient = ApolloClient.Builder()
@@ -22301,6 +22210,8 @@ val apolloClient = ApolloClient.Builder()
 
 4. **Query**
 
+Query використовується для читання даних:
+
 ```kotlin
 class UserRepository(
     private val apolloClient: ApolloClient
@@ -22318,11 +22229,9 @@ class UserRepository(
 }
 ```
 
-Query використовується для читання даних.
-
 5. **Mutation**
 
-Mutation використовується для зміни даних:
+Mutation змінює дані:
 
 ```graphql
 mutation UpdateUserName($id: ID!, $name: String!) {
@@ -22332,8 +22241,6 @@ mutation UpdateUserName($id: ID!, $name: String!) {
   }
 }
 ```
-
-Kotlin:
 
 ```kotlin
 val response = apolloClient
@@ -22354,8 +22261,6 @@ subscription OnMessageAdded($chatId: ID!) {
   }
 }
 ```
-
-Kotlin:
 
 ```kotlin
 apolloClient
@@ -22383,8 +22288,7 @@ Apollo:
 - models генеруються з schema/query;
 - response shape визначає client query.
 
-Якщо backend REST — використовувати Retrofit.  
-Якщо backend GraphQL — використовувати Apollo Kotlin.
+Якщо backend REST — Retrofit. Якщо backend GraphQL — Apollo Kotlin.
 
 8. **Type safety**
 
@@ -22397,16 +22301,14 @@ user {
 }
 ```
 
-у generated model будуть тільки ці поля. Якщо backend schema змінилася і query стала невалідною, build може впасти на етапі codegen/compile, а не в runtime.
-
-Це одна з головних переваг Apollo.
+у generated model будуть тільки ці поля. Якщо schema змінилася і query стала невалідною, build може впасти на codegen/compile, а не в runtime.
 
 9. **Cache**
 
 Apollo підтримує normalized cache. Це корисно, коли:
 
-- одна й та сама entity приходить із різних queries;
-- треба offline/cache behavior;
+- одна entity приходить із різних queries;
+- потрібен offline/cache behavior;
 - треба уникати зайвих network запитів;
 - треба оновлювати UI після mutation.
 
@@ -22417,7 +22319,7 @@ User(id=1) зберігається як entity
 різні queries можуть посилатися на неї
 ```
 
-Cache треба проєктувати обережно, особливо для складних offline сценаріїв.
+Cache strategy треба узгоджувати зі schema і normalized IDs.
 
 10. **Error handling**
 
@@ -22427,8 +22329,6 @@ GraphQL response може мати:
 - `errors`;
 - network exception;
 - partial data with errors.
-
-Приклад:
 
 ```kotlin
 val response = apolloClient
@@ -22443,31 +22343,18 @@ if (response.hasErrors()) {
 val data = response.data
 ```
 
-Важливо: GraphQL error не завжди означає, що HTTP status буде 4xx/5xx.
+GraphQL error не завжди означає HTTP 4xx/5xx.
 
-11. **Коли Apollo GraphQL доречний**
+11. **Практичне правило**
 
-Apollo Kotlin доречний, якщо:
-
-- backend використовує GraphQL;
-- потрібні type-safe queries;
-- client має контролювати shape response;
-- є багато різних screen-specific data needs;
-- потрібні subscriptions;
-- важлива інтеграція зі schema/codegen.
-
-Не доречний, якщо backend звичайний REST і немає GraphQL endpoint.
-
-12. **Практичне правило**
-
-- `.graphql` файли зберігати поруч із feature/data layer.
+- Apollo доречний, якщо backend використовує GraphQL.
+- `.graphql` файли тримати поруч із feature/data layer.
 - Generated models не тягнути напряму в UI без mapping.
 - GraphQL errors мапити в domain-level errors.
 - Auth додавати через interceptor.
 - Для REST — Retrofit, для GraphQL — Apollo.
-- Cache strategy узгоджувати з backend schema і normalized IDs.
 
-**Коротко:** Apollo Kotlin — це type-safe GraphQL client для Android/Kotlin. Він генерує Kotlin-код із GraphQL schema і queries, підтримує queries, mutations, subscriptions, cache і добре підходить для проєктів, де backend API побудований на GraphQL.
+**Коротко:** Apollo Kotlin — це type-safe GraphQL client для Android/Kotlin. Він генерує Kotlin-код із schema і queries, підтримує queries, mutations, subscriptions, cache і підходить для проєктів із GraphQL backend.
 
 </details>
 <details>
@@ -27625,7 +27512,7 @@ adapter.submitList(oldList + newUser)
 
 #### Kotlin
 
-`RecyclerView` працює як оптимізований контейнер для великих списків: він не створює View для всіх елементів, а тримає тільки видимі item views і невеликий cache. Під час скролу `ViewHolder`-и перевикористовуються, а `Adapter` заново bind-ить їх до інших позицій.
+`RecyclerView` — це оптимізований контейнер для великих списків. Він не створює View для всіх елементів, а тримає тільки видимі item views і невеликий cache. Під час scroll `ViewHolder`-и перевикористовуються, а `Adapter` заново bind-ить їх до інших позицій.
 
 1. **Головна ідея recycling**
 
@@ -27669,7 +27556,7 @@ RecyclerView measure/layout
  -> RecyclerView draws children
 ```
 
-Якщо ViewHolder ще немає — викликається `onCreateViewHolder()` і `onBindViewHolder()`. Якщо ViewHolder можна reuse-ити — тільки `onBindViewHolder()`.
+Якщо `ViewHolder` ще немає — викликається `onCreateViewHolder()` і `onBindViewHolder()`. Якщо його можна reuse-ити — тільки `onBindViewHolder()`.
 
 4. **Що відбувається при scroll**
 
@@ -27689,7 +27576,7 @@ binding.badge.isVisible = item.isImportant
 binding.checkbox.isChecked = item.isSelected
 ```
 
-Не можна покладатися на старий стан View, бо ViewHolder міг належати іншому item-у.
+Не можна покладатися на старий стан View, бо `ViewHolder` міг належати іншому item-у.
 
 5. **LayoutManager**
 
@@ -27745,20 +27632,15 @@ notifyItemChanged(position)
 
 Краще використовувати `DiffUtil`/`ListAdapter`, щоб RecyclerView отримував точні зміни: insert, remove, move, change. `notifyDataSetChanged()` змушує вважати, що змінився весь список.
 
-9. **ItemAnimator**
+9. **ItemAnimator і ItemDecoration**
+
+`ItemAnimator` анімує додавання, видалення, переміщення і зміну item-ів:
 
 ```kotlin
 recyclerView.itemAnimator = DefaultItemAnimator()
 ```
 
-Анімує додавання, видалення, переміщення і зміну item-ів. Якщо change animations дають flicker:
-
-```kotlin
-(recyclerView.itemAnimator as? SimpleItemAnimator)
-    ?.supportsChangeAnimations = false
-```
-
-10. **ItemDecoration**
+`ItemDecoration` додає dividers, spacing або custom drawing:
 
 ```kotlin
 recyclerView.addItemDecoration(
@@ -27766,9 +27648,7 @@ recyclerView.addItemDecoration(
 )
 ```
 
-Використовується для dividers, spacing, sticky headers або custom drawing без зміни item layout.
-
-11. **Чому onBindViewHolder має бути легким**
+10. **onBindViewHolder має бути легким**
 
 Погано:
 
@@ -27781,9 +27661,9 @@ override fun onBindViewHolder(holder: UserViewHolder, position: Int) {
 
 Це може лагати під час scroll. Краще передати модель, а картинки вантажити через image loader із cache/cancellation.
 
-12. **Position pitfalls**
+11. **Position pitfalls**
 
-Position може змінюватися через insert/remove/move. У click listener краще перевіряти актуальну позицію:
+Position може змінюватися через insert/remove/move. У click listener треба брати актуальну позицію:
 
 ```kotlin
 binding.root.setOnClickListener {
@@ -27796,18 +27676,17 @@ binding.root.setOnClickListener {
 
 Або передавати конкретний item у `bind()`, якщо adapter працює з immutable snapshots.
 
-13. **Практичне правило**
+12. **Практичне правило**
 
-- RecyclerView створює тільки потрібні ViewHolder-и.
-- ViewHolder-и перевикористовуються при scroll.
+- RecyclerView створює тільки потрібні `ViewHolder`-и.
+- `ViewHolder`-и перевикористовуються при scroll.
 - Adapter створює і bind-ить item UI.
 - LayoutManager відповідає за розміщення.
 - DiffUtil/ListAdapter дає точкові оновлення.
 - `bind()` має бути швидким і повністю встановлювати state.
 - Для різних item layouts використовувати `viewType`.
-- Для великих списків не використовувати ручний `LinearLayout.addView()`.
 
-**Коротко:** RecyclerView під капотом працює через reuse `ViewHolder`-ів, layout delegation у `LayoutManager`, cache/pool механізми і точкові adapter updates. Саме recycling і DiffUtil/ListAdapter роблять його ефективним для великих списків.
+**Коротко:** RecyclerView працює через reuse `ViewHolder`-ів, layout delegation у `LayoutManager`, cache/pool механізми і точкові adapter updates. Саме recycling і DiffUtil/ListAdapter роблять його ефективним для великих списків.
 
 </details>
 <details>
@@ -28728,7 +28607,7 @@ DataBinding доречний, якщо проєкт уже побудовани�
 
 #### Kotlin
 
-`Serializable` — це Java-механізм серіалізації, який дозволяє перетворити обʼєкт у послідовність байтів і потім відновити його назад. В Android `Serializable` можна використовувати для передачі обʼєктів через `Intent`/`Bundle`, але для Android-specific передачі даних зазвичай краще `Parcelable`, бо він швидший і оптимізований під Android.
+`Serializable` — це Java-механізм серіалізації, який дозволяє перетворити обʼєкт у послідовність байтів і потім відновити його назад. В Android його можна використовувати для `Intent`/`Bundle`, але зазвичай краще `Parcelable`, бо він швидший і оптимізований під Android.
 
 1. **Базове визначення**
 
@@ -28741,7 +28620,7 @@ data class User(
 ) : Serializable
 ```
 
-Тепер обʼєкт можна покласти в `Bundle` або `Intent`:
+Тепер обʼєкт можна покласти в `Intent`:
 
 ```kotlin
 intent.putExtra("user", user)
@@ -28753,13 +28632,13 @@ intent.putExtra("user", user)
 val user = intent.getSerializableExtra("user") as? User
 ```
 
-На новіших Android API краще використовувати typed overload, якщо доступний:
+На новіших Android API є typed overload:
 
 ```kotlin
 val user = intent.getSerializableExtra("user", User::class.java)
 ```
 
-Але часто треба враховувати version-specific API і робити compatibility wrapper.
+На практиці часто потрібен compatibility wrapper через різні API levels.
 
 3. **Як це працює концептуально**
 
@@ -28768,14 +28647,9 @@ Object -> serialization -> bytes
 bytes -> deserialization -> Object
 ```
 
-Серіалізація потрібна, коли обʼєкт треба:
+Серіалізація потрібна, коли обʼєкт треба передати, зберегти або відновити.
 
-- передати;
-- зберегти;
-- відновити;
-- перенести між процесами або компонентами.
-
-4. **Serializable в Android Bundle**
+4. **Serializable в Bundle**
 
 ```kotlin
 val bundle = Bundle().apply {
@@ -28789,7 +28663,7 @@ val bundle = Bundle().apply {
 val user = bundle.getSerializable("user") as? User
 ```
 
-Це працює, але для Android navigation/arguments краще частіше використовувати `Parcelable` або передавати тільки id.
+Це працює, але для Android navigation/arguments зазвичай краще `Parcelable` або передача тільки id.
 
 5. **Serializable vs Parcelable**
 
@@ -28805,8 +28679,7 @@ Parcelable:
   - Android-specific
   - швидший
   - оптимізований для IPC/Bundle
-  - потребує опису parceling
-  - з @Parcelize дуже простий
+  - з @Parcelize простий у використанні
 ```
 
 Parcelable:
@@ -28859,7 +28732,7 @@ data class User(
 ) : Serializable
 ```
 
-Якщо старий serialized object відновлюється в нову модель, можуть бути compatibility issues. Тому Serializable погано підходить для довготривалого persistent storage без контрольованої schema.
+Старі serialized objects можуть не відновитися коректно. Тому Serializable погано підходить для довготривалого persistent storage без контрольованої schema.
 
 8. **Не передавати великі обʼєкти**
 
@@ -28885,15 +28758,9 @@ intent.putExtra("user_id", user.id)
 
 А дані отримати з repository/cache/database.
 
-9. **Serializable не для domain persistence**
+9. **Не для domain persistence**
 
-Не треба використовувати Serializable як основний формат збереження domain data:
-
-```kotlin
-file.writeBytes(serialize(user))
-```
-
-Для storage краще:
+Не варто використовувати `Serializable` як основний формат збереження domain data. Для storage краще:
 
 - Room;
 - DataStore;
@@ -28901,61 +28768,26 @@ file.writeBytes(serialize(user))
 - backend;
 - files з контрольованим форматом.
 
-Serializable слабко контрольований для довгого життя даних.
-
-10. **Serializable і безпека**
-
-Deserialization загалом може бути небезпечною, якщо дані приходять з недовіреного джерела. В Android screen arguments зазвичай internal, але все одно не треба deserializе-ити довільні зовнішні дані без контролю.
-
-11. **Коли Serializable допустимий**
+10. **Коли Serializable допустимий**
 
 Serializable може бути допустимий:
 
-- для простих тимчасових аргументів;
+- для простих тимчасових arguments;
 - у legacy-коді;
 - для швидкого прототипу;
 - коли performance не критична;
 - коли обʼєкт маленький і internal.
 
-Але для production Android navigation краще:
+Для production navigation краще primitive args, ids, `Parcelable`, Safe Args або typed routes.
 
-- primitive args;
-- ids;
-- `Parcelable`;
-- Safe Args;
-- typed routes.
-
-12. **Приклад кращого підходу**
-
-Замість:
-
-```kotlin
-intent.putExtra("user", user)
-```
-
-Краще:
-
-```kotlin
-intent.putExtra("user_id", user.id)
-```
-
-У destination:
-
-```kotlin
-val userId = requireNotNull(intent.getStringExtra("user_id"))
-viewModel.loadUser(userId)
-```
-
-Це зменшує payload і робить screen більш стійким до process death.
-
-13. **Практичне правило**
+11. **Практичне правило**
 
 - `Serializable` — Java serialization marker interface.
 - В Android може передаватися через `Intent`/`Bundle`.
 - Для Android IPC/navigation краще `Parcelable`.
 - Не передавати великі objects.
 - Не використовувати як довготривалий storage format.
-- Найкраще між screens передавати ids і завантажувати дані з repository.
+- Між screens краще передавати ids і завантажувати дані з repository.
 
 **Коротко:** `Serializable` дозволяє перетворити обʼєкт у байти і передати/відновити його, але в Android це зазвичай менш ефективний варіант, ніж `Parcelable`. Для navigation краще передавати мінімальні arguments, найчастіше id.
 
