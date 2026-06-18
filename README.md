@@ -7603,17 +7603,13 @@ second user + second settings -> second result
 
 #### Kotlin
 
-`@JvmStatic`, `@JvmOverloads` і `@JvmField` — це Kotlin-анотації для кращої
-сумісності з Java. Вони не потрібні для звичайного Kotlin-коду, але важливі,
-коли API має зручно викликатися з Java, Android framework, reflection-based
-бібліотек або legacy Java-коду.
+`@JvmStatic`, `@JvmOverloads` і `@JvmField` — це Kotlin-анотації для сумісності з Java. Вони не потрібні для звичайного Kotlin-коду, але важливі, коли API має зручно викликатися з Java, Android framework або legacy Java-коду.
 
-1. **Навіщо вони взагалі потрібні**
+1. **Навіщо вони потрібні**
 
-Kotlin компілюється в JVM bytecode, але не всі Kotlin-конструкції напряму
-виглядають у Java так, як очікує Java-розробник.
+Kotlin компілюється в JVM bytecode, але не всі Kotlin-конструкції виглядають у Java так, як очікує Java-розробник.
 
-Наприклад, `companion object` у Kotlin:
+Наприклад, `companion object`:
 
 ```kotlin
 class UserFactory {
@@ -7629,18 +7625,15 @@ class UserFactory {
 val user = UserFactory.create()
 ```
 
-А з Java без `@JvmStatic`:
+З Java без `@JvmStatic`:
 
 ```java
 User user = UserFactory.Companion.create();
 ```
 
-Це не завжди бажаний Java API.
-
 2. **@JvmStatic**
 
-`@JvmStatic` генерує справжній static method або static property accessor для
-Java.
+`@JvmStatic` генерує справжній static method або static property accessor для Java.
 
 ```kotlin
 class UserFactory {
@@ -7651,40 +7644,15 @@ class UserFactory {
 }
 ```
 
-Тепер з Java:
+З Java:
 
 ```java
 User user = UserFactory.create();
 ```
 
-Без `@JvmStatic` Java викликала б метод через `Companion`.
+Типові місця використання: `companion object`, `object`, Java-facing API, factory methods, public library API.
 
-3. **Де використовувати @JvmStatic**
-
-Типові місця:
-
-- `companion object`;
-- `object`;
-- API, який активно викликається з Java;
-- Android framework callbacks або factory methods;
-- public library API для Java-користувачів.
-
-```kotlin
-object Logger {
-    @JvmStatic
-    fun log(message: String) {
-        println(message)
-    }
-}
-```
-
-З Java:
-
-```java
-Logger.log("Hello");
-```
-
-4. **@JvmOverloads**
+3. **@JvmOverloads**
 
 Kotlin має default arguments:
 
@@ -7695,16 +7663,7 @@ class UserService(
 )
 ```
 
-У Kotlin можна викликати:
-
-```kotlin
-UserService()
-UserService(retryCount = 5)
-UserService(timeoutMs = 10_000)
-```
-
-Java не підтримує Kotlin default arguments напряму. `@JvmOverloads` генерує
-кілька overload-методів/конструкторів для Java:
+Java не підтримує Kotlin default arguments напряму. `@JvmOverloads` генерує кілька overload-конструкторів або методів:
 
 ```kotlin
 class UserService @JvmOverloads constructor(
@@ -7721,7 +7680,7 @@ new UserService(5);
 new UserService(5, 10_000L);
 ```
 
-5. **@JvmOverloads для функцій**
+Для функцій:
 
 ```kotlin
 @JvmOverloads
@@ -7734,27 +7693,11 @@ fun showMessage(
 }
 ```
 
-Для Java будуть згенеровані overload-и:
+Overload-и генеруються з кінця параметрів, тому default parameters краще ставити після обовʼязкових.
 
-```java
-showMessage("Hi");
-showMessage("Hi", 5);
-showMessage("Hi", 5, true);
-```
+4. **@JvmOverloads в Android Views**
 
-Важливо: overload-и генеруються з кінця параметрів. Тому default parameters
-краще ставити після обовʼязкових.
-
-6. **Де використовувати @JvmOverloads**
-
-Добрі сценарії:
-
-- custom Android Views;
-- public API, який викликається з Java;
-- constructors для Java-friendly використання;
-- бібліотеки зі змішаним Kotlin/Java кодом.
-
-Приклад для Android custom view:
+Типовий Android-сценарій — custom view:
 
 ```kotlin
 class AvatarView @JvmOverloads constructor(
@@ -7766,7 +7709,7 @@ class AvatarView @JvmOverloads constructor(
 
 Це робить constructor зручним для Android framework і Java interop.
 
-7. **@JvmField**
+5. **@JvmField**
 
 За замовчуванням Kotlin property компілюється в private field + getter/setter:
 
@@ -7797,7 +7740,7 @@ class Config {
 config.apiUrl;
 ```
 
-8. **@JvmField у companion object**
+6. **@JvmField у companion object**
 
 Без `@JvmField`:
 
@@ -7832,14 +7775,13 @@ Java:
 Constants.DEFAULT_TIMEOUT;
 ```
 
-Для compile-time constants краще використовувати `const val`, якщо тип
-підходить:
+Для compile-time constants краще `const val`, якщо тип підходить:
 
 ```kotlin
 const val API_VERSION = "v1"
 ```
 
-9. **Коли не треба використовувати ці анотації**
+7. **Коли не треба використовувати**
 
 Якщо код використовується тільки з Kotlin, ці анотації часто зайві:
 
@@ -7851,25 +7793,22 @@ class UserMapper {
 }
 ```
 
-У Kotlin і так буде нормальний виклик:
+У Kotlin і так нормальний виклик:
 
 ```kotlin
 UserMapper.map(dto)
 ```
 
-Не треба додавати `@JvmStatic` просто "про всяк випадок". Це розширює bytecode
-API і може створювати зайві overload-и/entry points.
+Не треба додавати `@JvmStatic` або `@JvmOverloads` “про всяк випадок”, бо це розширює bytecode API і створює зайві entry points.
 
-10. **Практичне правило**
+8. **Практичне правило**
 
 - `@JvmStatic` — коли Java має викликати method/property як static.
 - `@JvmOverloads` — коли Java має бачити overload-и замість Kotlin default args.
 - `@JvmField` — коли Java має доступатися до field напряму без getter/setter.
 - Для чистого Kotlin API ці анотації зазвичай не потрібні.
 
-**Коротко:** ці анотації потрібні не для Kotlin-логіки, а для форми JVM API. Вони
-допомагають зробити Kotlin-код природним для Java та Android framework, але їх
-варто застосовувати тільки там, де реально є Java interop-потреба.
+**Коротко:** ці анотації потрібні не для Kotlin-логіки, а для форми JVM API. Вони роблять Kotlin-код природнішим для Java та Android framework, але застосовувати їх варто тільки там, де реально є Java interop-потреба.
 
 </details>
 <details>
