@@ -3594,10 +3594,7 @@ payload. `sealed class` краще для закритої ієрархії ст
 
 #### Kotlin
 
-`lateinit` і `lazy` вирішують схожу проблему — значення буде ініціалізоване
-пізніше, не в момент створення обʼєкта. Але це різні механізми з різними
-гарантіями: `lateinit` — відкладена ініціалізація mutable `var`, а `lazy` —
-відкладене обчислення read-only `val` при першому доступі.
+Обидва механізми відкладають ініціалізацію. `lateinit` — обіцянка пізніше присвоїти mutable `var`, а `lazy` — обчислити read-only `val` при першому доступі та закешувати result.
 
 1. **lateinit**
 
@@ -3611,8 +3608,7 @@ class UserController {
 }
 ```
 
-`lateinit` дозволяє оголосити non-null `var` без початкового значення. Значення
-має бути присвоєне до першого читання.
+`lateinit` дозволяє оголосити non-null `var` без initializer. Значення має бути присвоєне до першого читання.
 
 2. **Що буде, якщо прочитати lateinit до ініціалізації**
 
@@ -3622,17 +3618,14 @@ lateinit var name: String
 println(name) // UninitializedPropertyAccessException
 ```
 
-Якщо звернутися до `lateinit`-властивості до присвоєння, Kotlin кине
-`UninitializedPropertyAccessException`.
+Читання до присвоєння кидає `UninitializedPropertyAccessException`.
 
 3. **Обмеження lateinit**
 
-- Працює тільки з `var`.
-- Не працює з primitive types: `Int`, `Boolean`, `Long` тощо.
-- Не може бути nullable типом на кшталт `String?`.
-- Не дає thread-safety гарантій.
-- Добре підходить для dependency injection, тестів або framework lifecycle, але
-  потребує дисципліни.
+- лише `var`;
+- non-null reference type, не primitive;
+- без thread-safety гарантій;
+- доречний для DI, test setup або framework lifecycle.
 
 Можна перевірити ініціалізацію:
 
@@ -3652,15 +3645,14 @@ class UserService {
 }
 ```
 
-`lazy` виконає lambda тільки при першому зверненні до `expensiveConfig`, збереже
-результат і повертає той самий результат при наступних зверненнях.
+`lazy` виконає lambda при першому читанні й надалі повертатиме cached result.
 
 5. **Особливості lazy**
 
-- Використовується з `val`.
-- Ініціалізується один раз.
-- За замовчуванням thread-safe (`LazyThreadSafetyMode.SYNCHRONIZED`).
-- Підходить для дорогих обчислень або обʼєктів, які можуть не знадобитися.
+- використовується з `val`;
+- успішно обчислюється один раз;
+- за замовчуванням synchronized;
+- доречний для дорогого object, який може не знадобитися.
 
 ```kotlin
 val value: String by lazy(LazyThreadSafetyMode.NONE) {
@@ -3668,28 +3660,25 @@ val value: String by lazy(LazyThreadSafetyMode.NONE) {
 }
 ```
 
-Режим `NONE` можна використовувати, якщо точно відомо, що доступ буде з одного
-потоку.
+`NONE` допустимий лише коли доступ гарантовано серіалізований одним thread.
 
 6. **Ключова різниця**
 
-- `lateinit var` — значення встановлює зовнішній код пізніше.
-- `val by lazy` — значення обчислюється автоматично при першому доступі.
-- `lateinit` можна переприсвоювати.
-- `lazy` після першої ініціалізації не переобчислюється.
-- `lateinit` не thread-safe сам по собі.
-- `lazy` має configurable thread-safety.
+- `lateinit var` присвоює зовнішній код і може переприсвоїти;
+- `val by lazy` сам запускає initializer при першому access;
+- `lateinit` не thread-safe;
+- `lazy` має configurable thread-safety mode.
 
 7. **Android-приклади**
 
-`lateinit` часто бачать у DI або tests:
+`lateinit` часто використовують для field injection:
 
 ```kotlin
 @Inject
 lateinit var analytics: Analytics
 ```
 
-`lazy` часто використовують для обʼєктів, які не завжди потрібні:
+`lazy` — для object, який може не знадобитися:
 
 ```kotlin
 private val adapter by lazy {
@@ -3697,25 +3686,16 @@ private val adapter by lazy {
 }
 ```
 
-Але для View Binding у Fragment треба бути обережним: `lateinit` або nullable
-binding може легко створити lifecycle bug або memory leak, якщо не очищати
-посилання в `onDestroyView()`.
+Для Fragment View Binding обидва підходи потребують урахування View lifecycle: reference не повинен переживати `onDestroyView()`.
 
 8. **Практичне правило**
 
-- Якщо значення має бути immutable і може бути створене при першому доступі —
-  `lazy`.
-- Якщо значення встановлює DI/framework/test setup після створення обʼєкта —
-  `lateinit`.
-- Якщо значення може бути відсутнім як нормальний стан — краще nullable тип, а
-  не `lateinit`.
-- Якщо потрібна повторна зміна значення — `lateinit var` або звичайний `var`,
-  але з чітким lifecycle.
+- immutable value з власним initializer — `lazy`;
+- DI/framework присвоює після construction — `lateinit`;
+- відсутність є нормальним state — nullable type;
+- повторна mutation — звичайний `var` із чітким lifecycle.
 
-**Коротко:** `lateinit` — це обіцянка “я присвою це `var` до першого використання”.
-`lazy` — це делегат “обчисли це `val` при першому доступі й закешуй”. `lazy`
-краще для immutable delayed initialization, `lateinit` — для DI/framework-driven
-ініціалізації.
+**Коротко:** `lateinit` означає «зовнішній код присвоїть `var` до читання». `lazy` означає «initializer обчислить `val` при першому доступі та закешує result».
 
 </details>
 
@@ -5578,15 +5558,7 @@ Custom scope потребує `Job`, dispatcher і явного cleanup. Reposit
 
 #### Kotlin
 
-Корутина виконується на thread або pool, який надає `CoroutineDispatcher`. Вона не є thread: тисячі корутин можуть ділити невелику кількість threads.
-
-```kotlin
-viewModelScope.launch {
-    println(Thread.currentThread().name)
-}
-```
-
-`viewModelScope` на Android зазвичай стартує на `Dispatchers.Main`.
+Корутина не є thread. `CoroutineDispatcher` планує її segments на thread або pool; багато корутин можуть ділити невелику кількість threads. `viewModelScope` за замовчуванням використовує Main dispatcher.
 
 ### Dispatcher
 
@@ -5604,11 +5576,11 @@ scope.launch(Dispatchers.Default) {
 }
 ```
 
-- `Main` — View/Compose API та коротка presentation logic;
-- `IO` — blocking network, files, database або legacy SDK;
-- `Default` — parsing, cryptography, image processing та інші CPU-heavy tasks.
+- `Main` — UI API та коротка presentation logic;
+- `IO` — blocking I/O або legacy SDK;
+- `Default` — parsing, cryptography та CPU-heavy work.
 
-Корутина також може використовувати single-thread dispatcher або custom executor, якщо потрібна thread confinement. Але dispatcher треба закривати, якщо він володіє окремими threads.
+Для thread confinement можна використати dedicated dispatcher/executor; owner має закрити його threads.
 
 ### Thread після suspension
 
@@ -5622,9 +5594,9 @@ withContext(Dispatchers.IO) {
 }
 ```
 
-Після suspension вона може продовжитися на іншому thread того самого dispatcher-а. Coroutine context зберігається, але thread identity може змінитися.
+Після suspension continuation може потрапити на інший thread того самого dispatcher-а. Coroutine context зберігається, physical thread — ні.
 
-Для `Dispatchers.Main` continuation повертається на main thread. Для pool dispatchers код не повинен залежати від конкретного thread name або ID.
+`Dispatchers.Main` повертає execution на UI thread; на pool dispatcher код не залежить від thread name/ID.
 
 ### Перемикання context
 
@@ -5638,13 +5610,13 @@ viewModelScope.launch {
 }
 ```
 
-`withContext` виконує block в іншому context, повертає result і продовжує caller у попередньому context. Cancellation та exception залишаються частиною structured concurrency.
+`withContext` повертає result і відновлює caller context; cancellation та failure залишаються structured.
 
-Main-safe suspend API, наприклад Retrofit suspend або Room suspend DAO, часто вже перемикає blocking роботу самостійно й не потребує додаткового IO wrapper.
+Main-safe suspend API, наприклад Retrofit або Room DAO, саме забезпечує потрібне execution і не потребує зайвого IO wrapper.
 
 ### ThreadLocal
 
-Звичайний `ThreadLocal` ненадійний, якщо continuation переходить між threads. Значення можна переносити через coroutine context:
+Звичайний `ThreadLocal` не слідує за continuation. Його адаптують у context element:
 
 ```kotlin
 val requestId = ThreadLocal<String>()
@@ -5654,7 +5626,7 @@ withContext(requestId.asContextElement("request-42")) {
 }
 ```
 
-Краще передавати domain data явними parameters; context element доречний для logging/tracing infrastructure.
+Domain data краще передавати параметром; context element доречний для logging/tracing.
 
 ### Blocking і parallelism
 
@@ -5668,21 +5640,19 @@ repeat(10_000) {
 }
 ```
 
-`Thread.sleep()`, synchronous I/O або lock блокують thread dispatcher-а. На Main це заморожує UI, на Default зменшує CPU throughput.
+`Thread.sleep()`, sync I/O та lock блокують dispatcher thread. На Main це заморожує UI, на Default знижує CPU throughput.
 
-Велика кількість корутин не означає безкоштовну concurrency: network connections, memory і external services мають limits. Parallelism контролюють semaphore, queue або `limitedParallelism()`.
+Concurrency обмежують network/memory/service resources; fan-out контролюють `Semaphore`, queue або відповідним dispatcher parallelism.
 
 ### Практичні правила
 
-- thread виконання визначає dispatcher;
-- coroutine може змінити thread після suspension;
-- UI confinement — Main;
-- blocking I/O — IO, CPU work — Default;
-- не покладатися на ThreadLocal без context element;
-- не блокувати dispatcher;
-- custom thread pool має lifecycle і cleanup.
+- dispatcher визначає execution context;
+- suspension може змінити physical thread;
+- UI — Main, blocking I/O — IO, CPU — Default;
+- ThreadLocal потребує context element;
+- custom pool потребує cleanup.
 
-**Коротко:** корутина не прив'язана до одного thread, якщо dispatcher цього не гарантує. Dispatcher планує її execution, а після suspension continuation може перейти на інший thread того самого context.
+**Коротко:** coroutine не прив’язана до одного thread, якщо dispatcher не гарантує confinement. Після suspension вона може продовжитися на іншому thread того самого context.
 
 </details>
 <details>
@@ -8659,7 +8629,7 @@ Leaks збільшують GC pressure і ризик OOM, тому memory correc
 
 #### Kotlin
 
-`Retry with exponential backoff` — це повторна спроба виконати операцію з паузою, яка зростає після кожної невдалої спроби. Це корисно для тимчасових network/server errors, але небезпечно для помилок, які не виправляться повтором.
+Exponential backoff повторює transient failure зі зростаючою паузою. Retry має бути bounded, cancellable, із jitter та чітким predicate.
 
 1. **Базова ідея**
 
@@ -8670,7 +8640,7 @@ attempt 3 -> delay 4s
 attempt 4 -> delay 8s
 ```
 
-Зазвичай додають max delay, max attempts і jitter, щоб не створити одночасне навантаження на сервер.
+`maxAttempts` і `maxDelay` обмежують latency, jitter не дає багатьом clients повторювати запит одночасно.
 
 2. **Простий suspend retry**
 
@@ -8680,15 +8650,18 @@ suspend fun <T> retryWithBackoff(
     initialDelayMillis: Long = 1_000,
     maxDelayMillis: Long = 10_000,
     factor: Double = 2.0,
+    shouldRetry: (Throwable) -> Boolean,
     block: suspend () -> T
 ): T {
+    require(maxAttempts > 0)
     var currentDelay = initialDelayMillis
 
-    repeat(maxAttempts - 1) { attempt ->
+    repeat(maxAttempts - 1) {
         try {
             return block()
-        } catch (e: IOException) {
-            delay(currentDelay)
+        } catch (error: Exception) {
+            if (error is CancellationException || !shouldRetry(error)) throw error
+            delay(Random.nextLong(currentDelay + 1))
             currentDelay = (currentDelay * factor)
                 .toLong()
                 .coerceAtMost(maxDelayMillis)
@@ -8699,28 +8672,19 @@ suspend fun <T> retryWithBackoff(
 }
 ```
 
-Цей варіант retry-ить тільки `IOException`. Інші помилки не треба автоматично повторювати без причини.
+Це full jitter у межах current delay. У production також перевіряють коректність delay/factor parameters.
 
 3. **Використання**
 
 ```kotlin
-val user = retryWithBackoff {
+val user = retryWithBackoff(shouldRetry = ::shouldRetry) {
     api.getUser(userId)
 }
 ```
 
-Якщо API тимчасово недоступне, буде кілька повторних спроб із delay.
-
 4. **Jitter**
 
-Jitter додає випадковість до delay:
-
-```kotlin
-val jitter = Random.nextLong(0, 500)
-delay(currentDelay + jitter)
-```
-
-Це важливо, коли багато clients одночасно retry-ять після помилки. Без jitter вони можуть одночасно вдарити по серверу.
+Full/equal/decorrelated jitter розсіюють clients після спільного outage. Фіксовані `+ Random(0..500)` слабко допомагають при великих delays.
 
 5. **Retry predicate**
 
@@ -8734,7 +8698,7 @@ fun shouldRetry(error: Throwable): Boolean = when (error) {
 }
 ```
 
-Наприклад, `401`, `403`, `404` зазвичай не мають retry-итись.
+Для `429`/`503` варто поважати server `Retry-After`. `401` іноді обробляється окремим token refresh, а `403`/`404` зазвичай не retry-яться.
 
 6. **Flow retryWhen**
 
@@ -8753,11 +8717,11 @@ flow {
 }
 ```
 
-Це зручно для streams, але треба контролювати кількість attempts.
+`attempt` починається з нуля; delay треба cap-ити, щоб уникнути overflow та надмірного очікування.
 
 7. **Timeout**
 
-Retry не замінює timeout:
+Retry не замінює timeout operation/client-а:
 
 ```kotlin
 withTimeout(15_000) {
@@ -8767,34 +8731,21 @@ withTimeout(15_000) {
 }
 ```
 
-Без timeout retry може зробити UX занадто довгим.
-
 8. **Cancellation**
 
-`delay()` cancellable, тому coroutine cancellation працює нормально. Не треба ловити `CancellationException` як звичайну помилку для retry.
-
-```kotlin
-catch (e: CancellationException) {
-    throw e
-}
-```
+`delay()` cancellable. Generic catch/predicate не повинен перетворювати `CancellationException` на retry.
 
 9. **Коли retry не потрібен**
 
 Не retry-ити:
 
-- validation errors;
-- auth errors без refresh token logic;
-- 404;
-- business rule errors;
-- non-idempotent operations без idempotency key;
-- помилки, які користувач має виправити сам.
+- validation/business errors;
+- auth failure без окремого refresh flow;
+- 403/404;
+- non-idempotent operation без idempotency key;
+- input, який має виправити користувач.
 
-10. **Практичне правило**
-
-Retry має бути обмежений, cancellable, з backoff, jitter, timeout і чітким predicate. Інакше він може погіршити UX, навантажити backend або дублювати операції.
-
-**Коротко:** exponential backoff — це retry з паузою, яка зростає після кожної спроби. У Kotlin його роблять через suspend-функцію або `Flow.retryWhen`, додаючи max attempts, max delay, jitter, timeout, cancellation handling і перевірку, які помилки можна retry-ити.
+**Коротко:** exponential backoff у Kotlin реалізують suspend-loop або `Flow.retryWhen`. Обов’язкові max attempts/delay, jitter, timeout, retry predicate, cancellation propagation та idempotency.
 
 </details>
 <details>
@@ -8993,11 +8944,11 @@ lifecycleScope.launch {
 
 #### Kotlin
 
-`Activity` — це Android component, який представляє окремий екран або entry point UI. `Fragment` — це reusable частина UI і поведінки, яка живе всередині Activity або іншого Fragment.
+`Activity` — system component і UI entry point із власним window/task. `Fragment` — UI controller усередині Activity або parent Fragment, яким керує `FragmentManager`.
 
 1. **Activity**
 
-Activity має власний lifecycle і реєструється в manifest:
+Activity реєструється в manifest:
 
 ```kotlin
 class MainActivity : AppCompatActivity() {
@@ -9008,11 +8959,11 @@ class MainActivity : AppCompatActivity() {
 }
 ```
 
-Вона може бути entry point-ом app, отримувати intents, керувати window і бути host-ом для Fragment/Compose UI.
+Вона отримує intents, керує window та host-ить Fragment або Compose tree.
 
 2. **Fragment**
 
-Fragment — частина UI всередині Activity:
+Fragment створює/контролює частину View-based UI:
 
 ```kotlin
 class ProfileFragment : Fragment(R.layout.fragment_profile) {
@@ -9022,7 +8973,7 @@ class ProfileFragment : Fragment(R.layout.fragment_profile) {
 }
 ```
 
-Fragment має lifecycle, але залежить від host Activity і FragmentManager.
+Він не є окремим manifest/system component і залежить від host та `FragmentManager`.
 
 3. **Головна різниця**
 
@@ -9030,8 +8981,6 @@ Fragment має lifecycle, але залежить від host Activity і Fragm
 Activity -> самостійний Android component, має window/task/intent entry
 Fragment -> частина UI всередині Activity, керується FragmentManager
 ```
-
-Fragment не існує як окремий system component на рівні manifest.
 
 4. **Lifecycle**
 
@@ -9041,17 +8990,17 @@ Activity lifecycle:
 onCreate -> onStart -> onResume -> onPause -> onStop -> onDestroy
 ```
 
-Fragment має ще lifecycle своєї View:
+Fragment окремо має View lifecycle:
 
 ```text
 onCreateView -> onViewCreated -> onDestroyView
 ```
 
-Це важливо: Fragment object може жити довше, ніж його View.
+Fragment object може залишатися в back stack після знищення його View.
 
 5. **onDestroyView**
 
-У Fragment треба очищати View references:
+References на View очищають у `onDestroyView()`:
 
 ```kotlin
 override fun onDestroyView() {
@@ -9061,53 +9010,49 @@ override fun onDestroyView() {
 }
 ```
 
-Інакше можна отримати memory leak.
+UI collection також прив’язують до `viewLifecycleOwner`, а не до lifecycle Fragment object.
 
 6. **Navigation**
 
-Activity navigation часто працює через intents:
+Між Activities переходять через intents:
 
 ```kotlin
 startActivity(Intent(this, DetailsActivity::class.java))
 ```
 
-Fragment navigation — через FragmentManager або Navigation Component:
+Fragment navigation виконує `FragmentManager` або Navigation Component:
 
 ```kotlin
 findNavController().navigate(R.id.detailsFragment)
 ```
 
-7. **Reuse і composition**
+7. **Composition**
 
-Fragment можна перевикористати як частину різних layouts:
+Fragments можна по-різному комбінувати в layouts:
 
 ```text
 phone  -> Activity + один Fragment
 tablet -> Activity + list Fragment + details Fragment
 ```
 
-Activity більше підходить як host/container, Fragment — як screen або reusable UI block у View System.
+Це корисно для master-detail UI, хоча reuse окремих Views/composables часто простіший за reuse цілого Fragment.
 
 8. **ViewModel scope**
 
-Fragment може мати власну ViewModel або shared ViewModel з Activity:
+State можна scope-ити до Fragment або Activity:
 
 ```kotlin
 private val ownViewModel: ProfileViewModel by viewModels()
 private val sharedViewModel: SharedViewModel by activityViewModels()
 ```
 
-Scope треба вибирати залежно від того, кому належить state.
+Scope вибирають за реальним owner-ом state, а не лише для зручного sharing.
 
 9. **Compose контекст**
 
-У сучасних Compose apps Activity часто host-ить один Compose tree, а Fragment може не використовуватись. У hybrid apps Fragment все ще корисний для navigation, legacy UI або поступової міграції.
+У повністю Compose app Activity може host-ити один Compose tree без Fragments. У hybrid/View app Fragment залишається screen/navigation abstraction.
 
-10. **Практичне правило**
-
-Activity — це top-level container і Android entry point. Fragment — це частина UI з власним lifecycle, navigation і state scope. У View System Fragment часто представляє screen, але треба уважно працювати з `onDestroyView()` і back stack.
-
-**Коротко:** Activity — самостійний Android component із window, task, intents і manifest. Fragment — reusable UI component всередині Activity, керований FragmentManager. Fragment має окремий View lifecycle, тому головні ризики — leaks після `onDestroyView()`, неправильний scope ViewModel і складний back stack.
+**Коротко:** Activity — manifest component із window/task та intents. Fragment — UI controller усередині host, керований FragmentManager. Його View має коротший lifecycle, тому bindings і UI subscriptions очищають у `onDestroyView()`.
 
 </details>
 <details>
@@ -10121,19 +10066,11 @@ class FakeUserRepository : UserRepository {
 
 #### Kotlin
 
-`Hilt` — це dependency injection framework для Android, побудований поверх Dagger. Він спрощує DI setup, генерує Dagger components і дає готову інтеграцію з Android lifecycle: Application, Activity, Fragment, ViewModel, Service.
+`Hilt` — Android DI framework поверх Dagger. Він генерує component hierarchy, factories та wiring для Application, Activity, Fragment, ViewModel, View і Service.
 
 1. **Навіщо потрібен Hilt**
 
-Hilt допомагає не створювати залежності вручну:
-
-```kotlin
-class ProfileViewModel(
-    private val repository: ProfileRepository
-) : ViewModel()
-```
-
-Замість ручного factory/setup Hilt сам надає потрібні objects через generated dependency graph.
+Hilt знаходить constructor/module bindings у generated graph і створює object без ручного DI container/factory.
 
 2. **Application setup**
 
@@ -10142,7 +10079,7 @@ class ProfileViewModel(
 class App : Application()
 ```
 
-`@HiltAndroidApp` запускає генерацію root DI component для застосунку.
+`@HiltAndroidApp` генерує root `SingletonComponent` і application-level setup.
 
 3. **AndroidEntryPoint**
 
@@ -10151,7 +10088,7 @@ class App : Application()
 class ProfileFragment : Fragment()
 ```
 
-Ця анотація дозволяє Hilt inject-ити залежності в Android component і створювати правильний component scope.
+`@AndroidEntryPoint` створює generated component для Android class і дозволяє field/ViewModel injection. Parent components також мають бути Hilt-enabled.
 
 4. **Inject constructor**
 
@@ -10161,7 +10098,7 @@ class LoadProfileUseCase @Inject constructor(
 )
 ```
 
-Якщо Hilt знає, як створити всі constructor parameters, він може створити цей клас автоматично.
+Constructor injection — default, якщо всі parameters мають bindings.
 
 5. **ViewModel**
 
@@ -10172,11 +10109,11 @@ class ProfileViewModel @Inject constructor(
 ) : ViewModel()
 ```
 
-Hilt інтегрується з `ViewModelProvider` і створює ViewModel з потрібними залежностями.
+`@HiltViewModel` інтегрує generated factory з `ViewModelProvider`.
 
 6. **Modules**
 
-Якщо клас не можна створити через constructor injection або треба bind interface, використовують modules.
+Modules потрібні для interface binding або third-party class без injectable constructor.
 
 `@Binds` для interface:
 
@@ -10191,18 +10128,10 @@ interface ProfileModule {
 }
 ```
 
-`@Provides` для external classes:
-
-```kotlin
-@Module
-@InstallIn(SingletonComponent::class)
-object NetworkModule {
-    @Provides
-    fun provideOkHttpClient(): OkHttpClient = OkHttpClient.Builder().build()
-}
+`@Provides` method викликає external builder/factory, наприклад для OkHttp, Retrofit або Room.
 ```
 
-7. **Scopes**
+7. **Scopes і components**
 
 Hilt має lifecycle-aware scopes:
 
@@ -10212,11 +10141,7 @@ Hilt має lifecycle-aware scopes:
 @ViewModelScoped
 ```
 
-Scope визначає, скільки живе object. Наприклад, `@Singleton` — один instance на application component.
-
-8. **Components**
-
-Основні Hilt components:
+Scope кешує binding у відповідному component:
 
 ```text
 SingletonComponent        -> application
@@ -10227,33 +10152,22 @@ FragmentComponent         -> Fragment
 ServiceComponent          -> Service
 ```
 
-Dependency може залежати тільки від objects із того ж або довшого scope.
+Child component бачить parent bindings. Довгоживучий parent не може залежати від короткоживучого child. Unscoped binding створюється для кожного request.
 
-9. **Тестування**
+8. **Тестування**
 
-Hilt дозволяє замінювати modules у тестах:
+`@TestInstallIn` замінює production module у Hilt test component. Для unit test без Android graph dependencies простіше передати fake напряму через constructor.
 
-```kotlin
-@TestInstallIn(
-    components = [SingletonComponent::class],
-    replaces = [NetworkModule::class]
-)
-@Module
-object FakeNetworkModule
-```
+9. **Практичне правило**
 
-Це зручно для integration/instrumentation tests.
+- constructor injection — default;
+- `@Binds` — interface → implementation;
+- `@Provides` — external factory/builder;
+- scope — лише для потрібного shared lifetime;
+- Context qualifier і scope мають бути сумісними;
+- DI graph не містить business logic.
 
-10. **Практичне правило**
-
-- Constructor injection — default.
-- `@Binds` — для interfaces.
-- `@Provides` — для third-party classes/builders.
-- Scopes використовувати тільки коли потрібен shared lifetime.
-- Не inject-ити Android Context без розуміння scope.
-- Hilt — інструмент wiring, не заміна архітектури.
-
-**Коротко:** Hilt — Android DI framework поверх Dagger. Він генерує dependency graph, інтегрується з Android lifecycle, підтримує `@Inject`, `@HiltViewModel`, modules, scopes і test replacements. Його задача — безпечно зʼєднувати залежності, а не переносити бізнес-логіку в DI.
+**Коротко:** Hilt генерує Dagger graph та Android components. Constructor injection створює класи, modules описують external/interface bindings, scopes задають reuse, а test modules замінюють production wiring.
 
 </details>
 <details>
@@ -12300,7 +12214,7 @@ Back press має обробляти найближчий активний UI la
 
 #### Kotlin
 
-`rememberUpdatedState()` дає long-running effect актуальне value/callback без перезапуску effect-а. Він вирішує stale capture у `LaunchedEffect` і `DisposableEffect`.
+`rememberUpdatedState()` дає long-lived effect актуальне value/callback без restart. Він потрібен, коли lifecycle effect визначають одні keys, а інший input має оновлюватися всередині нього.
 
 ### Проблема
 
@@ -12316,7 +12230,7 @@ fun SplashScreen(
 }
 ```
 
-`LaunchedEffect(Unit)` не restart-иться при recomposition. Якщо parent передав нову `onTimeout`, coroutine може зберегти стару lambda.
+`LaunchedEffect(Unit)` не restart-иться після зміни callback, тому coroutine може використати stale lambda.
 
 ### Рішення
 
@@ -12335,7 +12249,7 @@ fun SplashScreen(
 }
 ```
 
-Timer не починається заново, але після delay викликається latest callback.
+Timer не починається заново, а після delay викликається latest callback.
 
 ```text
 effect key               -> визначає lifecycle/restart
@@ -12351,49 +12265,24 @@ LaunchedEffect(onTimeout) {
 }
 ```
 
-При зміні lambda попередня coroutine скасується, а timer почнеться заново. Це правильно лише якщо зміна callback справді повинна restart-ити operation.
+Після зміни lambda попередня coroutine скасується, а timer почнеться заново. Це правильно лише коли callback визначає нову operation.
 
-Стабільність lambda не завжди гарантована: parent може створювати новий function object на recomposition. Тому callback як key іноді запускає зайві restarts.
+Parent може створювати новий function object на recomposition, тому callback key здатен спричинити небажаний restart.
 
 ### DisposableEffect
 
 ```kotlin
-@Composable
-fun LifecycleEventHandler(
-    onStart: () -> Unit,
-    onStop: () -> Unit
-) {
-    val currentOnStart by
-        rememberUpdatedState(onStart)
-    val currentOnStop by
-        rememberUpdatedState(onStop)
+val currentOnEvent by rememberUpdatedState(onEvent)
+val owner = LocalLifecycleOwner.current
 
-    val owner = LocalLifecycleOwner.current
-
-    DisposableEffect(owner) {
-        val observer =
-            LifecycleEventObserver { _, event ->
-                when (event) {
-                    Lifecycle.Event.ON_START ->
-                        currentOnStart()
-
-                    Lifecycle.Event.ON_STOP ->
-                        currentOnStop()
-
-                    else -> Unit
-                }
-            }
-
-        owner.lifecycle.addObserver(observer)
-
-        onDispose {
-            owner.lifecycle.removeObserver(observer)
-        }
-    }
+DisposableEffect(owner) {
+    val observer = LifecycleEventObserver { _, event -> currentOnEvent(event) }
+    owner.lifecycle.addObserver(observer)
+    onDispose { owner.lifecycle.removeObserver(observer) }
 }
 ```
 
-Observer re-register-иться лише при зміні owner, але використовує latest callbacks.
+Observer re-register-иться лише при зміні `owner`, але викликає latest handler.
 
 ### Коли value має бути key
 
@@ -12403,7 +12292,7 @@ LaunchedEffect(userId) {
 }
 ```
 
-Якщо `userId` змінився, старе завантаження треба скасувати й запустити нове. Приховувати `userId` через `rememberUpdatedState` було б semantic bug.
+Зміна `userId` означає іншу operation, тому старий load треба скасувати. Приховувати ID через `rememberUpdatedState` було б semantic bug.
 
 Питання для вибору:
 
@@ -12415,26 +12304,18 @@ LaunchedEffect(userId) {
 
 ### Що API не робить
 
-`rememberUpdatedState`:
+API не запускає coroutine, не стабілізує lambda identity, не замінює effect keys і не зберігає value після виходу з composition.
 
-- не робить object immutable;
-- не стабілізує lambda identity;
-- не запускає coroutine;
-- не замінює правильні effect keys;
-- не зберігає value після виходу з composition;
-- не потрібен у звичайному composable rendering.
-
-Він повертає Compose `State<T>`, яке effect читає в момент використання.
+Він повертає `State<T>`, яке effect читає в момент використання.
 
 ### Типові сценарії
 
 - timeout із latest callback;
-- listener, який не треба re-register-ити;
-- animation completion callback;
-- long-running collection із latest handler/config;
-- external subscription, lifecycle якої визначають інші keys.
+- listener без re-registration;
+- animation completion handler;
+- external subscription із lifecycle, визначеним іншими keys.
 
-**Коротко:** `rememberUpdatedState()` потрібен, коли effect має зберегти свій lifecycle, але читати latest callback/value. Якщо зміна value означає нову operation, value повинно бути key effect-а.
+**Коротко:** `rememberUpdatedState()` оновлює value всередині effect без restart. Якщо зміна value означає нову operation, воно має бути key, а не `rememberUpdatedState`.
 
 </details>
 <details>
@@ -13864,7 +13745,7 @@ SOLID — не вимога додавати maximum шарів. Для прос
 
 #### Kotlin
 
-ООП — підхід, у якому система моделюється об'єктами, що поєднують стан і поведінку. Клас описує тип, а об'єкт є його instance:
+ООП моделює систему об’єктами, що поєднують state та behavior. Клас описує тип, object — його instance:
 
 ```kotlin
 class User(
@@ -13877,11 +13758,11 @@ class User(
 val user = User(id = "1", name = "Alex")
 ```
 
-Основні принципи ООП — інкапсуляція, абстракція, наслідування та поліморфізм.
+Основи: encapsulation, abstraction, inheritance і polymorphism.
 
 ### Інкапсуляція
 
-Клас приховує mutable state і дозволяє змінювати його лише контрольованими операціями:
+Клас приховує mutable state та змінює його контрольованими operations:
 
 ```kotlin
 class Cart {
@@ -13895,11 +13776,11 @@ class Cart {
 }
 ```
 
-Це захищає invariants класу. Повернення `List` замість `MutableList` обмежує API, але для повного захисту треба не віддавати назовні mutable implementation.
+Так клас захищає invariants. Read-only `List` звужує API, але назовні краще повертати snapshot, якщо backing collection може змінюватися.
 
 ### Абстракція
 
-Абстракція описує потрібний contract без деталей реалізації:
+Абстракція відділяє contract від implementation:
 
 ```kotlin
 interface UserRepository {
@@ -13911,11 +13792,11 @@ class ProfileViewModel(
 ) : ViewModel()
 ```
 
-ViewModel працює з contract і не залежить від Retrofit, Room, cache або fake implementation. Абстракція виправдана, коли ізолює мінливу деталь чи має кілька реалізацій, а не просто додає interface до кожного класу.
+ViewModel не знає про Retrofit, Room або fake. Interface доречний, коли ізолює мінливу boundary, а не просто дублює кожен class.
 
 ### Наслідування
 
-У Kotlin класи й методи `final` за замовчуванням. Наслідування треба дозволити явно:
+У Kotlin class і method `final` за замовчуванням; inheritance дозволяють через `open`:
 
 ```kotlin
 open class BaseProcessor {
@@ -13928,11 +13809,11 @@ class UppercaseProcessor : BaseProcessor() {
 }
 ```
 
-Наслідування моделює відношення «is-a», але створює сильний зв'язок із base class. У прикладному Android-коді композиція часто простіша й безпечніша.
+Inheritance моделює «is-a», але сильно зв’язує subclass із base implementation. Композиція часто безпечніша.
 
 ### Поліморфізм
 
-Різні реалізації можна використовувати через спільний contract:
+Polymorphism дозволяє підставляти різні implementations спільного contract:
 
 ```kotlin
 interface ImageLoader {
@@ -13948,28 +13829,18 @@ class FakeImageLoader : ImageLoader {
 }
 ```
 
-Caller залежить від `ImageLoader`, тому production і test implementations взаємозамінні.
+Caller працює з `ImageLoader`, тому production і test implementations взаємозамінні.
 
 ### ООП у Kotlin/Android
 
-Типові застосування:
+Kotlin доповнює класичне ООП:
 
-- ViewModel, Repository, UseCase — об'єкти з чіткою відповідальністю;
-- interfaces — межі між шарами та зовнішніми системами;
-- sealed class/interface — закрита ієрархія станів;
-- data class — value-like моделі;
-- dependency injection — передача залежностей через constructor.
+- `data class` — value-like models;
+- `sealed class/interface` — закриті hierarchies;
+- extension functions — behavior без inheritance;
+- constructor injection — explicit dependencies.
 
-```kotlin
-sealed interface LoginState {
-    data object Idle : LoginState
-    data object Loading : LoginState
-    data class Error(val message: String) : LoginState
-    data object Success : LoginState
-}
-```
-
-Композиція виражає можливість «has-a» і зазвичай краща за base classes:
+Композиція виражає «has-a» без base class coupling:
 
 ```kotlin
 class UserRepository(
@@ -13978,9 +13849,9 @@ class UserRepository(
 )
 ```
 
-ООП не виключає immutability, extension functions і функціональний стиль Kotlin. Важливіша модель відповідальностей, ніж кількість класів.
+ООП не суперечить immutability чи functional style. Важливі responsibility boundaries, а не кількість interfaces/classes.
 
-**Коротко:** ООП організовує код навколо об'єктів зі станом і поведінкою. Його основи — інкапсуляція, абстракція, наслідування та поліморфізм; у Kotlin перевагу часто віддають immutable моделям і композиції замість глибокої ієрархії наслідування.
+**Коротко:** ООП організовує state і behavior в objects через encapsulation, abstraction, inheritance та polymorphism. У Kotlin часто віддають перевагу immutable models і composition замість глибокого inheritance.
 
 </details>
 <details>
@@ -14106,11 +13977,11 @@ interface UserNameFormatter {
 
 #### Kotlin
 
-Конструктор створює та ініціалізує обʼєкт. Метод описує поведінку вже створеного обʼєкта. Тобто constructor викликається під час `ClassName(...)`, а method — після створення instance через `object.method()`.
+Конструктор створює instance і формує його початковий валідний state. Метод описує поведінку вже створеного object та може викликатися багато разів.
 
 1. **Конструктор**
 
-Primary constructor у Kotlin оголошується в заголовку класу:
+Primary constructor оголошується в заголовку класу:
 
 ```kotlin
 class User(
@@ -14119,20 +13990,11 @@ class User(
 )
 ```
 
-Створення обʼєкта:
-
-```kotlin
-val user = User(
-    id = "1",
-    name = "Alex"
-)
-```
-
-Параметри з `val` або `var` стають властивостями класу. Constructor відповідає за початковий валідний state обʼєкта.
+Параметри з `val`/`var` стають properties. Constructor не має return type і викликається через `User(...)`.
 
 2. **Метод**
 
-Метод — це функція всередині класу:
+Метод — member function класу:
 
 ```kotlin
 class User(
@@ -14145,17 +14007,11 @@ class User(
 }
 ```
 
-Виклик:
-
-```kotlin
-val displayName = user.displayName()
-```
-
-Метод виконує дію або повертає результат, але не створює сам обʼєкт.
+Метод виконує дію або повертає result через `user.displayName()`, але не створює instance.
 
 3. **init block**
 
-Якщо потрібна валідація або проста ініціалізація, використовують `init`:
+Для validation або initialization logic використовують `init`:
 
 ```kotlin
 class User(
@@ -14170,11 +14026,11 @@ class User(
 }
 ```
 
-`init` виконується під час створення instance.
+`init` blocks виконуються під час construction у порядку оголошення разом із property initializers.
 
 4. **Secondary constructor**
 
-Kotlin підтримує secondary constructors:
+Secondary constructor делегує primary через `this(...)`:
 
 ```kotlin
 class User(
@@ -14185,7 +14041,7 @@ class User(
 }
 ```
 
-Але частіше краще default parameters:
+Для простих overloads зазвичай достатньо default parameters:
 
 ```kotlin
 class User(
@@ -14194,32 +14050,7 @@ class User(
 )
 ```
 
-Це простіше й читабельніше.
-
-5. **Методи можна викликати багато разів**
-
-```kotlin
-class Counter {
-    private var value = 0
-
-    fun increment() {
-        value++
-    }
-
-    fun currentValue(): Int = value
-}
-```
-
-```kotlin
-val counter = Counter()
-counter.increment()
-counter.increment()
-val value = counter.currentValue()
-```
-
-Обʼєкт створюється один раз, а методи можуть викликатися багато разів.
-
-6. **Constructor injection**
+5. **Constructor injection**
 
 В Android constructor часто використовують для DI:
 
@@ -14235,17 +14066,16 @@ class GetUserProfileUseCase(
 }
 ```
 
-Constructor отримує залежності, а метод `invoke()` виконує поведінку.
+Constructor задає required dependencies, а `invoke()` виконує use case.
 
-7. **Що не варто робити в constructor**
+6. **Що не робити в constructor**
 
-Конструктор має бути легким. Не варто запускати там:
+Constructor має бути швидким і без lifecycle-dependent side effects. У ньому не запускають:
 
 - network request;
 - database query;
 - coroutine;
-- важку IO-операцію;
-- side effects;
+- важкий I/O;
 - Android lifecycle-dependent logic.
 
 Погано:
@@ -14268,15 +14098,14 @@ class UserRepository(private val api: UserApi) {
 }
 ```
 
-8. **Практичне правило**
+7. **Практичне правило**
 
-- Constructor — створення object-а, DI і базова валідація state.
-- Method — поведінка після створення object-а.
-- Constructor не має return type.
-- Method може мати return type.
-- Важку або lifecycle-dependent роботу краще запускати з методів, не з constructor-а.
+- constructor — required state, DI та validation;
+- method — repeatable behavior після construction;
+- важку, suspend або lifecycle-bound work запускають методом;
+- складні способи створення можна винести у factory.
 
-**Коротко:** конструктор створює й ініціалізує обʼєкт, а метод виконує дії вже створеного обʼєкта. В Android constructor часто використовують для dependency injection, а методи — для business/UI operations.
+**Коротко:** constructor створює валідний object і приймає dependencies; method виконує його поведінку. Heavy, suspend та lifecycle work не запускають під час construction.
 
 </details>
 <details>
@@ -14284,17 +14113,17 @@ class UserRepository(private val api: UserApi) {
 
 #### Kotlin
 
-Сигнатура — ознаки, за якими compiler/JVM ідентифікує function. Для Kotlin overload resolution основними є ім'я, receiver та список parameters: кількість, порядок і типи.
+Сигнатура — ознаки, за якими compiler розрізняє functions. У Kotlin overload resolution враховує name, receiver та parameter types/order; JVM має власний descriptor після compilation.
 
 ```kotlin
 fun loadUser(id: String): User
 ```
 
-Практично це `loadUser(String)`.
+Спрощено: `loadUser(String)`.
 
 ### Overloading
 
-Це різні сигнатури:
+Overloads мають відрізнятися parameter list:
 
 ```kotlin
 fun search(query: String)
@@ -14302,21 +14131,16 @@ fun search(query: String, limit: Int)
 fun search(userId: Long)
 ```
 
-Return type не може бути єдиною відмінністю:
+Return type або parameter name недостатньо:
 
 ```kotlin
 fun value(): String = "text"
-fun value(): Int = 42 // conflicting overloads
-```
-
-Імена parameters також не розрізняють overload-и:
-
-```kotlin
+fun value(): Int = 42 // conflict
 fun load(id: String)
-fun load(userId: String) // same signature
+fun load(userId: String) // conflict
 ```
 
-Named arguments впливають на Kotlin call site, але не створюють іншу JVM signature.
+Named arguments змінюють call-site readability, не signature.
 
 Порядок типів має значення:
 
@@ -14325,7 +14149,7 @@ fun create(name: String, age: Int)
 fun create(age: Int, name: String)
 ```
 
-Такий API валідний, але легко помилитися, тому краще використовувати чіткі names/types.
+Такий API валідний, але часто нечитабельний.
 
 ### Default parameters
 
@@ -14336,9 +14160,9 @@ fun loadUser(
 )
 ```
 
-Функція викликається з одним або двома arguments, але це не два source-level methods. Kotlin компілює додатковий synthetic default-argument mechanism. Для Java overload-и можна згенерувати через `@JvmOverloads`.
+Це одна source function із synthetic default-argument mechanism. Для Java overloads можна згенерувати через `@JvmOverloads`.
 
-Окремий `fun loadUser(id: String)` поруч може створити conflict або неочевидний resolution.
+Ручний overload поруч може створити conflict або ambiguous API.
 
 ### Override
 
@@ -14355,9 +14179,9 @@ class RealUserRepository : UserRepository {
 }
 ```
 
-Зміна `String` на `Long` створює іншу функцію. Return type override може бути covariant — більш конкретним subtype базового return type.
+Зміна parameter type створює іншу function. Override return type може бути covariant subtype.
 
-`suspend` є частиною Kotlin function contract: non-suspend function не override-ить suspend function. На JVM suspend method компілюється з додатковим `Continuation` parameter і `Object` return type.
+`suspend` є частиною Kotlin contract. На JVM suspend method отримує `Continuation` parameter і object-like return representation.
 
 ### Extension receiver
 
@@ -14366,7 +14190,7 @@ fun UserDto.toDomain(): User
 fun AdminDto.toDomain(): Admin
 ```
 
-Receiver type бере участь у Kotlin resolution і компілюється як parameter static method-а. Extension functions вирішуються статично й не є virtual overrides.
+Receiver бере участь у Kotlin resolution і компілюється як parameter static method-а. Extension не є virtual override.
 
 ### JVM-нюанси
 
@@ -14377,7 +14201,7 @@ fun process(items: List<String>)
 fun process(items: List<Int>) // same JVM signature after erasure
 ```
 
-На JVM обидва стають приблизно `process(List)`. Іноді clash вирішують іншим ім'ям або `@JvmName`.
+Після erasure обидва стають `process(List)`. Рішення — інше name або `@JvmName`.
 
 Nullability теж не створює окрему JVM signature:
 
@@ -14386,18 +14210,17 @@ fun load(id: String)
 fun load(id: String?) // JVM clash
 ```
 
-Generic bounds, value classes, properties та platform declarations можуть мати додаткові rules, тому варто відрізняти Kotlin overload resolution від фактичної JVM descriptor.
+Тому Kotlin source contract треба відрізняти від JVM descriptor.
 
 ### Практичні правила
 
-- ім'я + receiver + parameter types визначають overload;
-- return type або parameter names недостатні;
-- default parameters часто кращі за дублікати;
-- override зберігає contract;
-- generic erasure може створити JVM clash;
-- overload-и мають бути не лише валідними, а й читабельними.
+- overload: name + receiver + parameter types/order;
+- return type та parameter names недостатні;
+- override зберігає base contract;
+- erasure/nullability можуть створити JVM clash;
+- API має бути не лише валідним, а й читабельним.
 
-**Коротко:** сигнатура ідентифікує функцію за ім'ям, receiver-ом і parameters. Вона визначає overload/override, але JVM додає нюанси: type erasure, відсутність nullability у descriptor та спеціальне представлення suspend/extension functions.
+**Коротко:** Kotlin розрізняє functions за name, receiver і parameters. JVM descriptor додає нюанси erasure, відсутності nullability та спеціального представлення suspend/extension functions.
 
 </details>
 <details>
@@ -15486,22 +15309,15 @@ val user: User = json.decode(raw)
 
 #### Kotlin
 
-Type erasure означає, що JVM object зазвичай не зберігає concrete generic arguments. У runtime `List<String>` і `List<Int>` мають один raw class `List`.
-
-```kotlin
-val names: List<String> = listOf("Alex")
-val ages: List<Int> = listOf(30)
-```
-
-Compiler перевіряє types у source code, але runtime не може надійно відрізнити ці два lists за element type.
+Type erasure означає, що JVM object зазвичай не зберігає concrete generic arguments. `List<String>` і `List<Int>` мають runtime class `List`; різницю перевіряє compiler у source code.
 
 ### Чому виникає
 
-Java generics додали зі backward compatibility: generic code мав працювати з bytecode і libraries, створеними до generics. Type parameter стирається до upper bound або `Object`.
+Java generics проєктували для backward compatibility зі старим bytecode. Type parameter стирається до upper bound або `Object`.
 
-Kotlin/JVM використовує ту саму модель для сумісності з Java та JVM signatures.
+Kotlin/JVM дотримується тієї самої JVM model.
 
-Generic metadata може залишатися в class-file signatures і бути доступною reflection для declarations, але конкретний runtime object не несе повної інформації про свої type arguments.
+Class-file signature може містити metadata declaration, але runtime object не несе повного concrete generic type.
 
 ### Runtime checks
 
@@ -15519,7 +15335,7 @@ if (value is List<*>) {
 }
 ```
 
-`List<*>` — star projection: читання безпечне як `Any?`, але додавати довільні values не можна.
+`List<*>` дозволяє безпечно читати `Any?`, але не додавати довільні values.
 
 Cast теж не перевіряє всі elements:
 
@@ -15527,7 +15343,7 @@ Cast теж не перевіряє всі elements:
 val strings = value as List<String> // unchecked
 ```
 
-Якщо потрібна runtime validation:
+Для validation перевіряють кожен element:
 
 ```kotlin
 val strings = (value as? List<*>)
@@ -15537,20 +15353,11 @@ val strings = (value as? List<*>)
     }
 ```
 
-`filterIsInstance<String>()` відкине invalid elements, що має іншу семантику, ніж валідація всього list.
+`filterIsInstance<String>()` лише відкидає invalid elements і не валідовує весь list.
 
 ### Reified
 
-Звичайний type parameter стертий:
-
-```kotlin
-fun <T> isType(value: Any): Boolean {
-    // value is T is impossible
-    return false
-}
-```
-
-Inline function може мати `reified` parameter:
+Звичайний `T` недоступний для `is T`. Inline function може мати `reified` parameter:
 
 ```kotlin
 inline fun <reified T> isType(
@@ -15558,9 +15365,9 @@ inline fun <reified T> isType(
 ): Boolean = value is T
 ```
 
-Compiler підставляє runtime-accessible type у call site, тому доступні `T::class`, `is T` і APIs із class token.
+Compiler спеціалізує call site, тому доступні `T::class`, `is T` та class-token APIs.
 
-Але `reified` не відновлює erased nested arguments. Перевірка `List<String>` усе одно фактично не може перевірити type кожного element.
+`reified` не відновлює nested arguments: `List<String>` усе одно потребує перевірки elements або serializer-а.
 
 ### Type tokens і serializers
 
@@ -15575,7 +15382,7 @@ fun <T> decode(
 val user = decode(json, User::class.java)
 ```
 
-Для `List<User>` одного `Class<List>` недостатньо. Libraries використовують `Type`, `KType`, generated adapters або serializers. Наприклад, kotlinx.serialization отримує `KSerializer<T>`, а Moshi/Gson можуть використовувати parameterized type token.
+Для `List<User>` одного `Class<List>` недостатньо. Libraries використовують `Type`, `KType`, generated adapter або `KSerializer<T>`.
 
 ### JVM signature clash
 
@@ -15584,18 +15391,17 @@ fun handle(items: List<String>) {}
 fun handle(items: List<Int>) {}
 ```
 
-Після erasure обидві signatures стають приблизно `handle(List)`, тому виникає platform declaration clash. Рішення — інше method name або, для Java-facing bytecode, обережний `@JvmName`.
+Після erasure обидві signatures стають `handle(List)`, тому виникає platform clash. Потрібні різні names або обережний `@JvmName`.
 
 ### Практичні правила
 
-- runtime check container-а — `List<*>`;
+- container check — `List<*>`;
 - unchecked cast не є validation;
-- concrete non-nested type — `inline reified`;
-- nested generics/serialization — serializer або type token;
-- overload-и мають залишатися різними після erasure;
-- не плутати compile-time type safety з runtime metadata.
+- runtime `T` — `inline reified`;
+- nested generic — serializer/type token;
+- overloads мають відрізнятися після erasure.
 
-**Коротко:** JVM стирає concrete generic arguments заради Java backward compatibility. Kotlin зберігає compile-time safety, але runtime checks потребують star projections, `reified` для доступного type або serializer/type token для nested generics.
+**Коротко:** JVM стирає generic arguments заради Java compatibility. Runtime checks використовують star projection, `reified` для доступного `T` або serializer/type token для nested generics.
 
 </details>
 <details>
@@ -17509,11 +17315,11 @@ Authentication -> хто ти?
 Authorization  -> що тобі дозволено?
 ```
 
-Спочатку система встановлює identity користувача, потім перевіряє доступ до конкретної дії або ресурсу.
+Authentication встановлює principal, authorization оцінює policy для конкретної operation/resource.
 
 ### Authentication
 
-Підтвердження особи через password, OTP, biometrics, OAuth/OIDC або чинну session:
+Identity підтверджують password, OTP, passkey/biometrics, OAuth/OIDC або чинна session:
 
 ```kotlin
 interface AuthApi {
@@ -17524,75 +17330,39 @@ interface AuthApi {
 }
 ```
 
-Після успішного login backend часто видає credentials:
-
-```kotlin
-data class AuthTokens(
-    val accessToken: String,
-    val refreshToken: String
-)
-```
-
-Access token підтверджує session/identity для API. Refresh token отримує новий access token і не повинен використовуватися як звичайний API credential.
+Після login backend видає session cookie або tokens. Access token авторизує API request; refresh token використовується лише для отримання нового access token.
 
 ### Authorization
 
-Перевірка, чи має authenticated principal право виконати операцію:
+Authorization перевіряє право principal виконати operation:
 
 ```http
 DELETE /payments/123
 Authorization: Bearer <token>
 ```
 
-Backend перевіряє не лише role, а й resource ownership, permission, tenant, policy та context. Наприклад, звичайний user може редагувати власний profile, але не чужий.
+Backend враховує role, permissions, resource ownership, tenant і context. Role сама по собі часто недостатня.
 
 Типові моделі:
 
-- RBAC — доступ за roles;
+- RBAC — roles;
 - permission-based — granular permissions;
-- ABAC/policy-based — attributes користувача, ресурсу й context.
+- ABAC/policy-based — attributes principal/resource/context.
 
 ### 401 і 403
 
 ```text
-401 Unauthorized -> немає валідної authentication
-403 Forbidden    -> identity відома, але доступ заборонений
+401 Unauthorized -> request не має valid authentication credentials
+403 Forbidden    -> server зрозумів request, але відмовляє
 ```
 
-При `401` app може спробувати один синхронізований token refresh, а після невдачі очистити session і показати login. Нескінченний retry або паралельні refresh requests створюють цикли й races.
+При `401` app може виконати один синхронізований token refresh. Після failure session завершується; нескінченний retry або паралельні refresh requests створюють loops/races.
 
-При `403` повторна authentication зазвичай не допоможе: UI показує відсутність доступу або прибирає недоступну action.
+При `403` re-authentication зазвичай не змінює policy; UI показує відсутність доступу.
 
 ### Android client
 
-Token додають interceptor-ом:
-
-```kotlin
-class AuthInterceptor(
-    private val tokenStorage: TokenStorage
-) : Interceptor {
-
-    override fun intercept(
-        chain: Interceptor.Chain
-    ): Response {
-        val token = tokenStorage.getAccessToken()
-
-        val request = chain.request()
-            .newBuilder()
-            .apply {
-                token?.let {
-                    header(
-                        "Authorization",
-                        "Bearer $it"
-                    )
-                }
-            }
-            .build()
-
-        return chain.proceed(request)
-    }
-}
-```
+Client додає access token interceptor-ом, координує refresh через authenticator/session manager і зберігає credentials відповідно до threat model.
 
 App може використовувати permissions для UX:
 
@@ -17604,19 +17374,19 @@ if (state.canDeleteUser) {
 }
 ```
 
-Але прихована кнопка не є security boundary. Mobile client можна модифікувати, а API викликати напряму, тому authorization завжди примусово перевіряє backend.
+Прихована кнопка — лише UX. Modified client може викликати API напряму, тому backend завжди enforce-ить authorization.
 
 ### Розділення відповідальностей
 
-- authentication service видає/перевіряє session credentials;
-- authorization policy вирішує доступ до operation;
-- client безпечно зберігає token і коректно обробляє `401/403`;
-- backend не довіряє role/permission, переданим самим client-ом;
-- logout/revoke припиняє session відповідно до security model.
+- auth service видає/перевіряє credentials;
+- policy вирішує access до operation;
+- client обробляє credentials та `401/403`;
+- backend не довіряє role/permission від client-а;
+- logout/revoke завершує session за security model.
 
-Authentication не обов'язково означає password, а authorization не обмежується enum role. Це різні security decisions, навіть якщо технічно виконуються в одному middleware.
+Це різні security decisions, навіть якщо виконуються одним middleware.
 
-**Коротко:** authentication встановлює identity, authorization перевіряє право цієї identity на конкретний ресурс або дію. Android керує credentials і UX, але остаточну authorization enforcement завжди виконує backend.
+**Коротко:** authentication встановлює identity, authorization перевіряє її право на operation/resource. Client керує credentials і UX, але security enforcement завжди виконує backend.
 
 </details>
 <details>
@@ -19622,11 +19392,11 @@ StrictMode.setThreadPolicy(
 
 #### Kotlin
 
-Базові компоненти Android — це building blocks, з яких складається застосунок: `Activity`, `Service`, `BroadcastReceiver`, `ContentProvider`. Також у сучасній Android-архітектурі часто говорять про Fragment, ViewModel, WorkManager, але класичні system components саме ці чотири.
+Чотири application components, які знає Android system: `Activity`, `Service`, `BroadcastReceiver` і `ContentProvider`. Fragment, ViewModel та WorkManager — важливі Jetpack abstractions, але не базові system components.
 
 1. **Activity**
 
-`Activity` представляє екран або entry point UI:
+`Activity` — UI entry point із власними window та lifecycle:
 
 ```kotlin
 class MainActivity : AppCompatActivity() {
@@ -19636,11 +19406,11 @@ class MainActivity : AppCompatActivity() {
 }
 ```
 
-Вона має lifecycle, window, отримує intents і може host-ити Fragment або Compose UI.
+Вона отримує `Intent` і може host-ити Compose UI або Fragment.
 
 2. **Service**
 
-`Service` виконує роботу без власного UI:
+`Service` — component без власного UI:
 
 ```kotlin
 class SyncService : Service() {
@@ -19648,11 +19418,11 @@ class SyncService : Service() {
 }
 ```
 
-Service не означає автоматично background thread. Довгу роботу треба переносити в coroutine/thread. Для user-visible long-running задач використовують foreground service.
+Service callbacks за замовчуванням працюють на main thread. Для ongoing user-visible work потрібен foreground service; deferrable persistent work зазвичай належить WorkManager.
 
 3. **BroadcastReceiver**
 
-`BroadcastReceiver` отримує system або app broadcasts:
+`BroadcastReceiver` отримує system/app broadcasts:
 
 ```kotlin
 class BootReceiver : BroadcastReceiver() {
@@ -19662,27 +19432,25 @@ class BootReceiver : BroadcastReceiver() {
 }
 ```
 
-`onReceive()` має бути коротким. Для довгої роботи краще делегувати в WorkManager або Service.
+`onReceive()` має швидко завершитися; тривалу persistent work делегують WorkManager.
 
 4. **ContentProvider**
 
-`ContentProvider` дає іншим apps або компонентам доступ до структурованих даних через URI:
+`ContentProvider` надає структуровані дані через URI:
 
 ```text
 content://com.example.provider/users/1
 ```
 
-Сьогодні у звичайних apps його пишуть рідше, але він важливий для sharing data, contacts, media, files, search suggestions.
+Його використовують для controlled inter-process data sharing; системні приклади — contacts і media providers.
 
 5. **Intent**
 
-Компоненти часто взаємодіють через `Intent`:
+`Intent` запускає Activity/Service або доставляє broadcast:
 
 ```kotlin
 startActivity(Intent(this, DetailsActivity::class.java))
 ```
-
-Intent може запускати Activity/Service або надсилати broadcast.
 
 6. **Manifest**
 
@@ -19695,48 +19463,23 @@ System components оголошуються в `AndroidManifest.xml`:
 <provider android:name=".AppProvider" />
 ```
 
-Manifest також визначає permissions, intent filters і exported behavior.
+Manifest також задає permissions, intent filters та `exported` behavior. Динамічний receiver можна реєструвати runtime.
 
-7. **Fragment**
+7. **Jetpack abstractions**
 
-Fragment не є базовим system component, але часто використовується як частина UI всередині Activity:
+- Fragment — частина View-based UI всередині Activity;
+- ViewModel — owner UI state, який переживає configuration changes;
+- WorkManager — scheduler persistent deferrable work.
 
-```kotlin
-class ProfileFragment : Fragment(R.layout.fragment_profile)
-```
+8. **Практичний вибір**
 
-Він має власний lifecycle і керується FragmentManager.
+- UI entry — Activity;
+- ongoing user-visible work — foreground Service;
+- system/app event — BroadcastReceiver;
+- inter-process data API — ContentProvider;
+- deferrable persistent work — WorkManager.
 
-8. **ViewModel**
-
-ViewModel теж не system component, але це стандартний Jetpack-компонент для state management:
-
-```kotlin
-class ProfileViewModel : ViewModel()
-```
-
-Він переживає configuration changes і тримає UI state.
-
-9. **WorkManager**
-
-WorkManager не є класичним component, але використовується для deferrable background work:
-
-```kotlin
-class SyncWorker(...) : CoroutineWorker(...)
-```
-
-Для sync/upload/retry він часто кращий за Service.
-
-10. **Практичне правило**
-
-- UI entry — Activity.
-- Частина UI у View System — Fragment.
-- Long-running user-visible робота — foreground Service.
-- Deferrable background work — WorkManager.
-- System/app events — BroadcastReceiver.
-- Data sharing між apps — ContentProvider.
-
-**Коротко:** класичні базові Android components — `Activity`, `Service`, `BroadcastReceiver`, `ContentProvider`. Вони оголошуються в manifest і взаємодіють через intents/URI. У modern Android також часто використовують Fragment, ViewModel і WorkManager, але це вже Jetpack/architecture components, не всі з них є system components.
+**Коротко:** system components — `Activity`, `Service`, `BroadcastReceiver` і `ContentProvider`. Вони оголошуються в manifest та взаємодіють через Intent/Binder/URI; Fragment, ViewModel і WorkManager належать Jetpack-рівню.
 
 </details>
 <details>
@@ -20741,7 +20484,7 @@ requestLayout() -> новий measure/layout
 
 #### Kotlin
 
-`onStart()` викликається, коли Activity переходить у visible state. UI вже створений у `onCreate()`, але Activity ще не обов'язково має focus або готова до interaction.
+`onStart()` викликається при переході Activity у visible state. UI вже створений, але Activity ще не обов’язково має interaction focus.
 
 ```text
 first launch: onCreate -> onStart -> onResume
@@ -20749,7 +20492,7 @@ background:   onPause -> onStop
 return:       onRestart -> onStart -> onResume
 ```
 
-Один Activity instance може пройти `onStart()` багато разів.
+Один instance проходить `onStart()` після першого launch і кожного повернення зі `STOPPED`.
 
 ### onStart vs onResume
 
@@ -20758,38 +20501,20 @@ STARTED -> visible
 RESUMED -> foreground та interactive
 ```
 
-Наприклад, при partially transparent Activity поверх поточна Activity може залишатися STARTED, але перейти з RESUMED у PAUSED.
+Під partially transparent Activity поточна може залишатися `STARTED`, але бути `PAUSED`.
 
-Тому ресурси, потрібні під час видимості, прив'язують до `onStart/onStop`; ресурси лише для active interaction — до `onResume/onPause`.
+Visible-only resources прив’язують до `onStart/onStop`, interaction-only — до `onResume/onPause`.
 
 ### Симетричний lifecycle
 
-```kotlin
-override fun onStart() {
-    super.onStart()
-
-    ContextCompat.registerReceiver(
-        this,
-        syncReceiver,
-        IntentFilter(ACTION_SYNC_FINISHED),
-        ContextCompat.RECEIVER_NOT_EXPORTED
-    )
-}
-
-override fun onStop() {
-    unregisterReceiver(syncReceiver)
-    super.onStop()
-}
-```
-
-Якщо listener або receiver реєструється в `onStart()`, його знімають у `onStop()`. Код має бути idempotent і не створювати duplicate registrations після кожного повернення на екран.
+Listener/receiver, зареєстрований у `onStart()`, знімають у `onStop()`. Setup має бути idempotent, щоб повторний start не створював duplicate registration.
 
 Тут доречні:
 
-- visible-only listeners та lightweight resources;
-- screen visibility analytics;
-- start/stop preview або sensor, якщо semantics — visible;
-- синхронізація з зовнішнім UI-related controller.
+- visible-only listeners/resources;
+- visibility analytics;
+- preview/sensor із visibility semantics;
+- connection до UI-related controller.
 
 Одноразову ініціалізацію Activity роблять у `onCreate()`, а не в `onStart()`.
 
@@ -20805,22 +20530,15 @@ lifecycleScope.launch {
 }
 ```
 
-Block запускається при STARTED і скасовується при переході нижче STARTED. Після повернення collection створюється заново.
+Block запускається у `STARTED`, скасовується нижче цього state та створюється знову після повернення.
 
-Якщо треба збирати кілька нескінченних flows, їх запускають у child coroutines:
+Кілька нескінченних flows усередині block збирають у паралельних child coroutines.
 
-```kotlin
-repeatOnLifecycle(Lifecycle.State.STARTED) {
-    launch { viewModel.state.collect(::render) }
-    launch { viewModel.effects.collect(::handleEffect) }
-}
-```
-
-У Fragment для UI використовують `viewLifecycleOwner.lifecycleScope` і `viewLifecycleOwner.repeatOnLifecycle`, щоб collection завершилася в `onDestroyView()`.
+У Fragment collection прив’язують до `viewLifecycleOwner`, щоб завершити її в `onDestroyView()`.
 
 ### Чого не робити
 
-`onStart()` виконується на main thread, тому тут не можна робити blocking network/disk I/O, важкий parsing або `Thread.sleep()`.
+`onStart()` працює на main thread: blocking I/O, parsing і `Thread.sleep()` тут неприпустимі.
 
 ```kotlin
 override fun onStart() {
@@ -20829,11 +20547,11 @@ override fun onStart() {
 }
 ```
 
-Callback може лише ініціювати асинхронну роботу в scope з правильним owner-ом. Але автоматичний refresh при кожному `onStart()` має бути навмисним: rotation, permission dialog або повернення з іншого Activity можуть запустити його повторно. ViewModel/repository повинні контролювати deduplication і freshness.
+Callback може ініціювати async work. Refresh при кожному start має бути навмисним: recreation або повернення з іншого screen запускає його знову, тому ViewModel/repository контролює freshness і deduplication.
 
-Не слід використовувати `onStart()` для довготривалої background work, яка має пережити Activity. Для такої роботи потрібен WorkManager, foreground service або application-level owner залежно від вимог.
+Work, що має пережити Activity, належить WorkManager, foreground service або application owner залежно від вимог.
 
-**Коротко:** `onStart()` означає, що Activity стала видимою. Тут запускають visible-only lightweight resources, а cleanup роблять у `onStop()`. Flow краще збирати через `repeatOnLifecycle(STARTED)`, а важку чи довготривалу роботу — виносити з lifecycle callback.
+**Коротко:** `onStart()` означає visibility. Тут запускають lightweight visible-only resources із cleanup у `onStop()`. Flow збирають через `repeatOnLifecycle(STARTED)`, а heavy/persistent work виносять.
 
 </details>
 <details>
@@ -21573,28 +21291,21 @@ val Context.dataStore by preferencesDataStore(
 
 #### Kotlin
 
-Paging 3 — Jetpack-бібліотека для посторінкового завантаження великих списків. Вона керує pages, prefetch, retry, refresh, cancellation та інтеграцією з RecyclerView/Compose.
+Paging 3 завантажує великі datasets сторінками та керує prefetch, deduplication, refresh/retry, cancellation і UI integration.
 
 ### PagingSource
 
-`PagingSource<Key, Value>` завантажує одну сторінку:
+`PagingSource<Key, Value>` описує single source та key pagination:
 
 ```kotlin
 class UsersPagingSource(
     private val api: UsersApi
 ) : PagingSource<Int, UserDto>() {
 
-    override suspend fun load(
-        params: LoadParams<Int>
-    ): LoadResult<Int, UserDto> {
+    override suspend fun load(params: LoadParams<Int>): LoadResult<Int, UserDto> {
         val page = params.key ?: 1
-
         return try {
-            val response = api.getUsers(
-                page = page,
-                size = params.loadSize
-            )
-
+            val response = api.getUsers(page, params.loadSize)
             LoadResult.Page(
                 data = response.users,
                 prevKey = page.takeIf { it > 1 }?.minus(1),
@@ -21605,15 +21316,14 @@ class UsersPagingSource(
         }
     }
 
-    override fun getRefreshKey(
-        state: PagingState<Int, UserDto>
-    ): Int? = state.anchorPosition
+    override fun getRefreshKey(state: PagingState<Int, UserDto>): Int? =
+        state.anchorPosition
         ?.let(state::closestPageToPosition)
         ?.let { it.prevKey?.plus(1) ?: it.nextKey?.minus(1) }
 }
 ```
 
-`load()` повертає `Page` або `Error`; cancellation не треба перехоплювати. Keys краще брати з metadata backend-а. `getRefreshKey()` допомагає зберегти позицію при refresh.
+`load()` повертає `Page`/`Error`; cancellation не перехоплюють. Keys беруть із backend metadata, а `getRefreshKey()` визначає позицію нового generation після refresh.
 
 ### Pager і ViewModel
 
@@ -21635,7 +21345,7 @@ val users = repository.users()
     .cachedIn(viewModelScope)
 ```
 
-`cachedIn` ділить PagingData та завантажені pages у scope ViewModel, тому rotation не запускає pipeline з нуля.
+`cachedIn(viewModelScope)` кешує paging stream у scope ViewModel, щоб новий UI collector не запускав pipeline з нуля.
 
 ### UI і LoadState
 
@@ -21654,22 +21364,7 @@ LazyColumn {
 }
 ```
 
-Load states:
-
-- `refresh` — initial load або повний refresh;
-- `append` — наступна page;
-- `prepend` — попередня page.
-
-```kotlin
-when (users.loadState.refresh) {
-    is LoadState.Loading -> LoadingScreen()
-    is LoadState.Error ->
-        ErrorScreen(onRetry = users::retry)
-    is LoadState.NotLoading -> Unit
-}
-```
-
-Append loading/error зазвичай показують footer-ом. `retry()` повторює failed load, `refresh()` створює нове покоління PagingData. Для RecyclerView використовують `PagingDataAdapter`.
+`loadState.refresh`, `append` і `prepend` окремо представляють initial/refresh та завантаження в обидва боки. UI показує full-screen state для refresh і footer/header для append/prepend. `retry()` повторює failed load, `refresh()` створює нове generation. Для RecyclerView є `PagingDataAdapter`.
 
 ### RemoteMediator
 
@@ -21681,15 +21376,15 @@ UI <- PagingSource from Room
 RemoteMediator: API -> Room + remote keys
 ```
 
-UI читає DB, а `RemoteMediator` завантажує remote pages і транзакційно записує data разом із pagination keys. Це запобігає дублюванню або пропуску items після refresh.
+UI читає Room, а `RemoteMediator` завантажує API pages і транзакційно записує data з remote keys. DB залишається source of truth.
 
 ### Коли використовувати
 
-Paging потрібен для великих remote/DB списків, infinite scroll та offline cache. Для малого статичного списку простіший один запит і `List`.
+Paging доречний для великих remote/DB datasets, infinite scroll та offline cache. Для малого bounded list простіший один request.
 
-Типові помилки: відсутній `cachedIn`, неправильні keys, необроблені append errors, unstable item IDs і ручна pagination паралельно з Paging.
+Типові помилки: неправильні keys, відсутній `cachedIn`, ignored append error, unstable item ID та паралельна manual pagination.
 
-**Коротко:** Paging 3 будує pipeline `PagingSource -> Pager -> PagingData -> UI`, керує load states і retry, а `cachedIn` зберігає завантаження в scope ViewModel. Для API + Room використовується `RemoteMediator`.
+**Коротко:** pipeline — `PagingSource -> Pager -> PagingData -> UI`; `cachedIn` прив’язує stream до ViewModel. Для API + Room `RemoteMediator` оновлює DB, яка лишається source of truth.
 
 </details>
 <details>
@@ -21793,7 +21488,7 @@ override fun getItemViewType(position: Int): Int = when (items[position]) {
 
 #### Kotlin
 
-Три обов'язкові методи `RecyclerView.Adapter` визначають створення item UI, binding даних і розмір списку:
+Три основні abstract methods створюють holder, bind-ять item та повідомляють розмір dataset:
 
 ```kotlin
 override fun onCreateViewHolder(
@@ -21815,11 +21510,11 @@ override fun onBindViewHolder(holder: UserViewHolder, position: Int) {
 override fun getItemCount(): Int = items.size
 ```
 
-`onCreateViewHolder()` викликається лише коли потрібен новий holder. `onBindViewHolder()` викликається при показі або оновленні item. Через recycling `bind()` має повністю встановлювати стан View, включно з `false`/порожніми значеннями.
+`onCreateViewHolder()` викликається, коли немає reusable holder. `onBindViewHolder()` — при показі/оновленні item. Через recycling повний bind встановлює весь View state, включно з `false`, `null` і empty values.
 
 ### Різні типи item
 
-`getItemViewType()` повертає тип елемента, за яким `onCreateViewHolder()` створює відповідний holder:
+`getItemViewType()` визначає, який holder створити:
 
 ```kotlin
 override fun getItemViewType(position: Int): Int =
@@ -21832,7 +21527,7 @@ override fun getItemViewType(position: Int): Int =
 
 ### Часткове оновлення
 
-Payload дозволяє оновити лише змінену частину item:
+Payload дає виконати partial bind:
 
 ```kotlin
 override fun onBindViewHolder(
@@ -21848,7 +21543,7 @@ override fun onBindViewHolder(
 }
 ```
 
-Якщо payload відсутній, завжди потрібен повний bind.
+Порожній `payloads` завжди означає full bind; delivery payload не гарантується для detached item.
 
 ### Recycling lifecycle
 
@@ -21856,11 +21551,11 @@ override fun onBindViewHolder(
 - `onViewAttachedToWindow()` — item приєднаний до window;
 - `onViewDetachedFromWindow()` — item більше не attached.
 
-У cleanup скасовують item-specific animations або jobs і прибирають callbacks. Image loader зазвичай сам працює з lifecycle View, але custom resources треба звільняти явно.
+У `onViewRecycled()` скасовують item-specific animations/jobs і callbacks. Attach/detach не слід плутати зі створенням/знищенням holder-а.
 
 ### Оновлення даних
 
-Ручні методи мають точно відповідати зміні колекції:
+Manual notifications мають точно відповідати mutation dataset:
 
 ```kotlin
 notifyItemInserted(position)
@@ -21869,32 +21564,20 @@ notifyItemChanged(position, payload)
 notifyItemMoved(fromPosition, toPosition)
 ```
 
-`notifyDataSetChanged()` перемальовує весь список і не дає RecyclerView інформації про конкретні зміни. Для звичайних production-списків краще `ListAdapter` або `AsyncListDiffer` з `DiffUtil.ItemCallback`:
+`notifyDataSetChanged()` не описує конкретні changes. Для snapshot lists зазвичай використовують `ListAdapter`/`AsyncListDiffer` із `DiffUtil.ItemCallback`.
 
-```kotlin
-class UserAdapter :
-    ListAdapter<User, UserViewHolder>(UserDiffCallback) {
-
-    override fun onBindViewHolder(holder: UserViewHolder, position: Int) {
-        holder.bind(getItem(position))
-    }
-}
-
-adapter.submitList(users)
-```
-
-Для stable IDs викликають `setHasStableIds(true)` і перевизначають `getItemId()`. ID має стабільно представляти identity item-а, а не його позицію.
+Stable IDs мають бути унікальними та представляти identity, не position.
 
 ### Типові помилки
 
-- не скидати старий state під час bind;
-- виконувати важку роботу в `onBindViewHolder()`;
-- зберігати переданий `position` у click listener замість актуального `bindingAdapterPosition`;
-- використовувати нестабільні IDs;
-- змінювати список без відповідного notify або diff;
-- передавати mutable list і змінювати його після `submitList()`.
+- неповний state у bind;
+- важка робота в `onBindViewHolder()`;
+- captured `position` замість `bindingAdapterPosition` або bound item;
+- mutation без відповідного notify/diff;
+- mutable list після `submitList()`;
+- неунікальні stable IDs.
 
-**Коротко:** основні методи Adapter — `onCreateViewHolder()`, `onBindViewHolder()` і `getItemCount()`. `getItemViewType()`, payloads та recycling callbacks покривають складніші сценарії, а оновлення списку краще делегувати `ListAdapter` і `DiffUtil`.
+**Коротко:** основні methods — `onCreateViewHolder()`, `onBindViewHolder()` і `getItemCount()`. Додатково важливі `getItemViewType()`, payload bind, recycling callbacks і точна синхронізація dataset updates.
 
 </details>
 <details>
@@ -23016,11 +22699,11 @@ fun UserEntity.toDomain() = User(id, name)
 
 #### Kotlin
 
-Якщо поле може бути відсутнім у відповіді API, це треба явно відобразити в DTO-моделі: зробити поле nullable, задати default value або обробити custom serialization. Головне — не припускати, що backend завжди поверне ідеальний JSON.
+DTO має відображати API contract: optional field отримує default, explicit `null` потребує nullable type, а invalid required field має завершити decoding/mapping помилкою.
 
 1. **Nullable поле**
 
-Якщо поле справді опціональне:
+Якщо backend може надіслати `null`:
 
 ```kotlin
 data class UserDto(
@@ -23030,7 +22713,7 @@ data class UserDto(
 )
 ```
 
-Потім у mapper треба перетворити DTO у domain/UI model:
+Mapper визначає domain fallback:
 
 ```kotlin
 fun UserDto.toDomain(): User = User(
@@ -23042,7 +22725,7 @@ fun UserDto.toDomain(): User = User(
 
 2. **Default value**
 
-Якщо відсутнє поле має мати дефолтне значення:
+Для missing field задають default:
 
 ```kotlin
 @Serializable
@@ -23053,7 +22736,7 @@ data class UserDto(
 )
 ```
 
-Default value корисний, коли backend може не прислати поле, але app має стабільну fallback-поведінку.
+Default має відповідати contract, а не приховувати backend regression.
 
 3. **Відсутнє поле vs null**
 
@@ -23069,7 +22752,7 @@ Default value корисний, коли backend може не прислати 
 { "name": null }
 ```
 
-У DTO треба розуміти, чи backend не присилає поле взагалі, чи присилає `null`. Різні serializers можуть обробляти це по-різному.
+Missing означає «ключа немає», explicit null — «ключ є без value». Їхня semantics може відрізнятися, наприклад у PATCH response.
 
 4. **Kotlin Serialization**
 
@@ -23081,17 +22764,15 @@ data class ProfileDto(
 )
 ```
 
-Якщо поле має default value, Kotlin Serialization може нормально декодувати JSON без цього поля. Для nullable без default поведінка залежить від налаштувань і схеми.
+Default `kotlinx.serialization` використовує property default для missing key. Nullable property без default лишається required і за відсутності кидає `MissingFieldException`; `explicitNulls = false` змінює цю поведінку.
 
 5. **Moshi/Gson**
 
-З Moshi/Gson nullable поля зазвичай стають `null`, якщо поле відсутнє. Але для non-null Kotlin properties без default можна отримати exception або некоректну модель, залежно від adapter/codegen.
-
-Тому для API DTO краще не робити non-null поле, якщо backend не гарантує його на 100%.
+Поведінка Moshi/Gson залежить від Kotlin adapter/codegen та configuration. Її треба зафіксувати tests для missing, explicit null, wrong type та unknown enum.
 
 6. **Mapper layer**
 
-DTO не треба напряму використовувати в UI. Краще мати mapper:
+DTO не передають напряму в UI:
 
 ```kotlin
 data class UserUi(
@@ -23107,11 +22788,11 @@ fun UserDto.toUi(): UserUi = UserUi(
 )
 ```
 
-Mapper — місце, де вирішується fallback logic.
+Mapper валідовує transport model і створює domain/UI model зі зрозумілими guarantees.
 
 7. **Required fields**
 
-Якщо поле критичне для роботи, краще не маскувати проблему:
+Критичне поле не маскують fallback-ом:
 
 ```kotlin
 fun UserDto.toDomain(): User {
@@ -23120,11 +22801,11 @@ fun UserDto.toDomain(): User {
 }
 ```
 
-Але це рішення залежить від домену: іноді треба fallback, іноді — fail fast.
+Repository може перетворити invalid response на typed error та logging/metric.
 
-8. **Sealed result / error handling**
+8. **Typed error**
 
-Якщо API може бути неповним, repository може повертати результат:
+Невалідний response можна виразити явно:
 
 ```kotlin
 sealed interface LoadUserResult {
@@ -23133,18 +22814,17 @@ sealed interface LoadUserResult {
 }
 ```
 
-Так UI не працює з “напіввалідною” моделлю без розуміння проблеми.
+UI не отримує напіввалідний `User`.
 
 9. **Практичне правило**
 
-- Optional field — nullable або default value.
-- Required field — non-null і fail fast при відсутності.
-- DTO не показувати напряму в UI.
-- Fallback logic тримати в mapper/domain layer.
-- Перевірити поведінку serializer для missing vs null.
-- Контракт API бажано зафіксувати в документації або tests.
+- missing optional field — default;
+- explicit null — nullable type;
+- required field — validation/failure;
+- DTO → mapper → domain/UI model;
+- serializer behavior фіксують contract tests.
 
-**Коротко:** якщо поле може бути відсутнім у API, його треба моделювати як nullable або з default value, а fallback обробляти в mapper layer. Для критичних полів краще fail fast або явно повертати error result. DTO не варто напряму використовувати в UI.
+**Коротко:** missing field моделюють default value, explicit null — nullable type. Mapper перетворює DTO на валідну domain model, а відсутність required field — на explicit error.
 
 </details>
 <details>
@@ -23288,28 +22968,27 @@ Hilt/Dagger/Koin автоматизують wiring, коли graph і кільк
 
 #### Kotlin
 
-Dagger/Hilt і Koin — це DI-рішення для Kotlin/Android, але вони працюють по-різному. Dagger/Hilt генерують dependency graph на compile time, а Koin будує graph переважно в runtime через Kotlin DSL.
+Dagger/Hilt і Koin — DI-рішення з різною моделлю wiring. Dagger генерує factories/components; Hilt додає Android component hierarchy. Koin використовує container та Kotlin DSL/annotations, а сучасний compiler plugin може перевіряти graph під час compilation.
 
 1. **Dagger**
 
-`Dagger` — compile-time DI framework. Він генерує код і перевіряє graph під час компіляції.
+`Dagger` генерує DI code та валідує graph під час compilation.
 
 Плюси:
 
-- compile-time validation;
-- висока performance;
-- явний dependency graph;
-- добре підходить для великих enterprise Android apps.
+- compile-time graph validation;
+- direct generated factories без runtime lookup;
+- explicit components/scopes.
 
 Мінуси:
 
-- більше boilerplate;
-- складніший learning curve;
-- помилки компіляції можуть бути важкими для читання.
+- більше annotations/modules;
+- складніша component hierarchy;
+- іноді важкі compiler diagnostics/build impact.
 
 2. **Hilt**
 
-`Hilt` — надбудова над Dagger для Android. Він спрощує DI setup і дає готові Android scopes/components.
+`Hilt` — Android layer над Dagger з generated components, стандартними scopes та Jetpack integrations.
 
 ```kotlin
 @HiltViewModel
@@ -23318,16 +22997,11 @@ class ProfileViewModel @Inject constructor(
 ) : ViewModel()
 ```
 
-```kotlin
-@AndroidEntryPoint
-class ProfileFragment : Fragment()
-```
-
-Hilt зменшує boilerplate Dagger і краще інтегрується з Android lifecycle.
+Він зменшує manual Dagger setup і задає стандартний Android graph.
 
 3. **Koin**
 
-`Koin` — Kotlin DSL для dependency injection/service location style:
+Koin описує definitions через Kotlin DSL або annotations:
 
 ```kotlin
 val appModule = module {
@@ -23337,35 +23011,25 @@ val appModule = module {
 }
 ```
 
-Плюси:
+DSL дає мало ceremony та легко читається. Без compiler validation missing/ambiguous definitions можуть проявитися runtime; compiler plugin Koin 4.2 перевіряє modules, qualifiers і call sites під час compilation.
 
-- простий старт;
-- мало boilerplate;
-- Kotlin DSL;
-- зручно для малих/середніх проєктів.
-
-Мінуси:
-
-- частина помилок проявляється runtime;
-- нижча compile-time safety;
-- graph може бути менш явним у великих apps.
-
-4. **Compile-time vs runtime**
+4. **Graph validation**
 
 ```text
-Dagger/Hilt -> graph перевіряється при компіляції
-Koin        -> багато помилок видно тільки під час запуску
+Dagger/Hilt         -> generated graph + compile-time validation
+Koin classic runtime -> runtime definitions/lookups
+Koin compiler plugin -> compile-time validation + runtime container
 ```
 
-Наприклад, якщо залежність не оголошена, Dagger/Hilt зламає build, а Koin може впасти runtime exception.
+Тому твердження «Koin завжди знаходить помилки лише runtime» вже застаріле; усе залежить від обраного setup.
 
 5. **Performance**
 
-Dagger/Hilt зазвичай швидший, бо використовує generated code. Koin робить lookup через runtime container. Для більшості середніх apps Koin може бути достатнім, але у великих проєктах Dagger/Hilt має кращу predictability.
+Dagger/Hilt викликає generated factories. Koin resolve-ить definitions через runtime container, тому startup/runtime profile відрізняється. Різницю слід вимірювати на реальному graph, а не вибирати framework лише за microbenchmark.
 
 6. **Scopes**
 
-Hilt має Android-aware scopes:
+Hilt має predefined Android scopes:
 
 ```kotlin
 @Singleton
@@ -23373,43 +23037,20 @@ Hilt має Android-aware scopes:
 @ViewModelScoped
 ```
 
-Koin теж підтримує scopes, але їх треба організовувати через Koin DSL і lifecycle integration.
+Koin також підтримує scopes та Android integrations, але ownership graph команда моделює у Koin configuration.
 
 7. **Тестування**
 
-Обидва дозволяють підміняти залежності в тестах.
-
-Hilt:
-
-```kotlin
-@TestInstallIn(...)
-@Module
-object FakeModule
-```
-
-Koin:
-
-```kotlin
-loadKoinModules(module {
-    single<UserRepository> { FakeUserRepository() }
-})
-```
-
-Koin часто простіший у тестовому setup, Hilt — більш строгий і формальний.
+Hilt замінює modules через test components/`@TestInstallIn`, Koin — test modules та definition overrides. В unit tests найпростіше передавати fake напряму через constructor.
 
 8. **Що вибрати**
 
-- Великий Android-проєкт, багато команд, потрібна строгість — Hilt.
-- Legacy Dagger project — лишатись на Dagger/Hilt.
-- Малий/середній проєкт, швидкий старт — Koin.
-- Потрібна максимальна compile-time safety — Hilt/Dagger.
-- Потрібна простота і мінімум ceremony — Koin.
+- Hilt — standard Android component hierarchy та Dagger ecosystem;
+- Koin — DSL/annotations, простіше custom wiring і KMP use cases;
+- existing Dagger graph зазвичай не варто переписувати без вимірюваної користі;
+- оцінюють compile safety setup, build time, startup, scopes і expertise команди.
 
-9. **Практичне правило**
-
-Для production Android у великій команді я б частіше обрав Hilt, бо compile-time validation і стандартна Android integration зменшують ризики. Koin нормальний вибір, якщо команда розуміє runtime graph risks і проєкт не має надмірно складного dependency graph.
-
-**Коротко:** Dagger/Hilt — compile-time DI з generated code, високою строгістю і кращою predictability для великих Android apps. Koin — runtime DI через Kotlin DSL, простіший у старті, але менш compile-time safe. Hilt зазвичай краще для великих production-проєктів, Koin — для простоти й швидкого розвитку.
+**Коротко:** Dagger/Hilt генерує DI code та дає стандартний Android graph. Koin використовує runtime container із DSL/annotations, але compiler plugin уже додає compile-time validation. Вибір залежить від architecture, tooling і досвіду команди.
 
 </details>
 <details>
@@ -24603,7 +24244,7 @@ data class UserEntity(
 
 #### Kotlin
 
-Ні. Primary constructor `data class` повинен мати щонайменше один parameter, і всі його parameters мають бути `val` або `var`.
+Ні. Primary constructor `data class` повинен містити щонайменше один parameter, і кожен parameter має бути `val` або `var`.
 
 Некоректно:
 
@@ -24624,7 +24265,7 @@ data class User(
 
 ### Чому constructor обов'язковий
 
-Compiler генерує data methods на основі properties primary constructor:
+Compiler генерує methods лише з primary-constructor properties:
 
 ```text
 equals()
@@ -24634,7 +24275,7 @@ copy()
 componentN()
 ```
 
-Для `User(id, name)` identity/value semantics визначають саме `id` і `name`.
+Саме вони визначають value semantics.
 
 Property у body не входить у generated equality, hash, copy і destructuring:
 
@@ -24646,9 +24287,9 @@ data class User(
 }
 ```
 
-Два objects з однаковим `id`, але різним `cachedLabel`, будуть рівними. `copy()` також не копіює body property через constructor; новий instance отримає initializer/default state.
+Objects з однаковим `id`, але різним `cachedLabel`, рівні. `copy()` створить body property заново через initializer.
 
-Тому всі fields, що визначають value, треба розміщувати в primary constructor.
+Value-defining fields мають бути в primary constructor.
 
 ### Виклик без arguments
 
@@ -24663,15 +24304,13 @@ data class User(
 val user = User()
 ```
 
-Це data class із двома parameters, просто caller їх не передає. Якщо всі primary constructor parameters мають default values, JVM compiler також генерує parameterless constructor, що корисно для деяких Java/framework APIs.
+Class усе одно має два parameters, але caller використовує defaults. На JVM, якщо defaults є для всіх parameters, генерується parameterless constructor.
 
-Але порожні defaults можуть створити invalid domain object. Для domain model краще вимагати валідні values, а framework DTO/ORM model відокремити або використовувати adapter/plugin.
+Defaults на кшталт `id = ""` не повинні створювати invalid domain object лише заради framework.
 
 ### Frameworks
 
-Для JPA та інших frameworks, які вимагають no-arg constructor, Kotlin має no-arg compiler plugin. Serialization libraries на кшталт kotlinx.serialization, Moshi або Room часто не потребують порожнього domain constructor і мають власну code generation/model policy.
-
-Не слід додавати `id = ""` лише для framework, якщо empty ID порушує invariant.
+Для framework із no-arg requirement використовують adapter, окрему persistence model або Kotlin no-arg plugin.
 
 ### Стан без payload
 
@@ -24697,23 +24336,23 @@ sealed interface ScreenState {
 }
 ```
 
-`object` дає singleton instance. `data object` додатково має узгоджену data-like `toString()` та equality semantics і добре поєднується з data classes у sealed hierarchy.
+`object` створює singleton. `data object` додає data-like `toString()`/equality semantics та симетрично виглядає в sealed hierarchy.
 
-Якщо потрібен звичайний stateless type із кількома instances, це може бути regular class, але зазвичай singleton точніше виражає відсутність payload.
+Для state без payload singleton зазвичай точніший за пустий regular class.
 
 ### Інші обмеження data class
 
-Data class не може бути `abstract`, `open`, `sealed` або `inner`. Вона може реалізовувати interfaces та успадковувати concrete/abstract members за правилами Kotlin, але generated methods мають окремі constraints.
+Data class не може бути `abstract`, `open`, `sealed` або `inner`, але може реалізовувати interfaces.
 
 ### Практичний вибір
 
-- value model із data — `data class`;
-- no-arg call — constructor defaults, якщо вони валідні;
-- singleton state без payload — `data object`;
-- framework no-arg requirement — adapter/compiler plugin;
-- value-defining property — primary constructor.
+- value model — `data class`;
+- no-arg call — valid defaults;
+- state без payload — `data object`;
+- framework no-arg — adapter/plugin;
+- value property — primary constructor.
 
-**Коротко:** порожній `data class` не компілюється: потрібен хоча б один `val/var` parameter. Defaults дозволяють виклик `User()`, але parameters залишаються. Для case без payload використовують `object` або `data object`.
+**Коротко:** empty `data class` не компілюється: потрібен хоча б один `val/var` parameter. Defaults дозволяють виклик без arguments, а state без payload моделюють `object`/`data object`.
 
 </details>
 <details>
@@ -24978,36 +24617,34 @@ WorkManager — для deferrable, guaranteed background work. Якщо зада
 
 #### Kotlin
 
-WorkManager потрібен для persistent deferrable work: задача може виконатися пізніше, але має пережити process death і запускатися за constraints.
+WorkManager обирають для persistent deferrable work: operation може стартувати пізніше, але має продовжити планування після process death або reboot та виконатися за constraints.
 
-Сценарії: sync, retry upload, cleanup, відправка logs, periodic refresh. Точний час не гарантується; force stop та uninstall зупиняють work.
+Сценарії: sync, retry upload, cleanup, logs і periodic refresh. Exact time не гарантується; force stop та uninstall припиняють work.
 
 ### One-time work
 
 ```kotlin
-val request =
-    OneTimeWorkRequestBuilder<SyncWorker>()
-        .setConstraints(
-            Constraints.Builder()
-                .setRequiredNetworkType(
-                    NetworkType.CONNECTED
-                )
-                .build()
-        )
-        .build()
+val request = OneTimeWorkRequestBuilder<SyncWorker>()
+    .setConstraints(
+        Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+    )
+    .build()
 
 WorkManager.getInstance(context)
     .enqueue(request)
 ```
 
-Request зберігається у внутрішній DB WorkManager і планується системним scheduler-ом.
+Request persist-иться та передається system scheduler-у.
 
 ### CoroutineWorker
 
 ```kotlin
-class SyncWorker(
-    context: Context,
-    params: WorkerParameters,
+@HiltWorker
+class SyncWorker @AssistedInject constructor(
+    @Assisted context: Context,
+    @Assisted params: WorkerParameters,
     private val repository: SyncRepository
 ) : CoroutineWorker(context, params) {
 
@@ -25029,21 +24666,13 @@ class SyncWorker(
 - `retry()` — transient failure;
 - `failure()` — permanent failure.
 
-Worker має бути idempotent: його можуть зупинити й запустити повторно. Cancellation не перетворюють на retry.
+Worker має бути idempotent: його можуть зупинити та запустити повторно. Cancellation не перетворюють на retry.
 
 ### Constraints та unique work
 
-```kotlin
-val constraints = Constraints.Builder()
-    .setRequiredNetworkType(NetworkType.UNMETERED)
-    .setRequiresCharging(true)
-    .setRequiresBatteryNotLow(true)
-    .build()
-```
+Constraints описують network, charging, battery/storage conditions, але не момент запуску. Для retries налаштовують backoff.
 
-Constraints визначають умови, а не момент запуску. Для retries налаштовують backoff.
-
-Щоб уникнути duplicate sync:
+Unique work запобігає duplicate sync:
 
 ```kotlin
 WorkManager.getInstance(context)
@@ -25054,51 +24683,28 @@ WorkManager.getInstance(context)
     )
 ```
 
-`KEEP` залишає існуючу work, `REPLACE` замінює її, `APPEND` додає в chain.
+Policy залишає, замінює або продовжує existing work/chain.
 
 ### Periodic work
 
-```kotlin
-PeriodicWorkRequestBuilder<SyncWorker>(
-    12,
-    TimeUnit.HOURS
-).build()
-```
-
-Periodic work виконується приблизно: Doze, battery policy та constraints зміщують запуск. Для exact user alarm потрібен AlarmManager, якщо use case має право на точність.
+Periodic work виконується приблизно: Doze, battery policy та constraints зміщують запуск. Exact user alarm потребує `AlarmManager`, якщо use case має право на точність.
 
 ### Input data
 
-`Data` використовують лише для невеликих primitive/String values:
-
-```kotlin
-workDataOf("file_id" to fileId)
-```
-
-Великі objects передають через ID, а Worker читає актуальні дані з Room/file. Це також полегшує restart після process death.
+`Data` використовують для невеликих primitive/String values. Великі objects зберігають у Room/file, а Worker отримує ID і читає актуальні дані після restart.
 
 ### Коли не підходить
 
 ```text
-screen-bound work       -> ViewModel/lifecycle scope
-exact alarm             -> AlarmManager
-media/socket/navigation -> Foreground Service
-realtime loop           -> active runtime architecture
+screen-bound work -> ViewModel/lifecycle scope
+exact alarm       -> AlarmManager
+media/tracking    -> Foreground Service
+realtime socket   -> active runtime architecture
 ```
 
-Для негайної user-visible тривалої роботи потрібне foreground execution. Expedited WorkManager має quotas і не є realtime API.
+Expedited work має quotas і не перетворює WorkManager на realtime API.
 
-### Практичне правило
-
-WorkManager обирають, якщо operation:
-
-- можна відкласти;
-- важливо виконати після закриття UI;
-- має constraints/retry;
-- можна зробити idempotent;
-- не потребує точного часу.
-
-**Коротко:** WorkManager виконує persistent deferrable work із constraints, retry та unique policies. Він переживає process death, але не гарантує exact timing. Для UI work, realtime, media та exact alarms потрібні інші механізми.
+**Коротко:** WorkManager потрібен, якщо idempotent operation можна відкласти, але важливо виконати після закриття UI з constraints/retry. Для UI work, realtime, media та exact alarms використовують інші механізми.
 
 </details>
 <details>
@@ -25106,7 +24712,7 @@ WorkManager обирають, якщо operation:
 
 #### Kotlin
 
-Так. `Media3` — Jetpack-набір для відтворення audio/video, а `ExoPlayer` — стандартна реалізація інтерфейсу `Player`. Він підтримує локальні файли, streaming, playlists, adaptive formats, subtitles і DRM.
+Так. `Media3` — Jetpack media stack, а `ExoPlayer` — default implementation інтерфейсу `Player`. Він підтримує local/streaming media, playlists, adaptive formats, subtitles та DRM.
 
 1. **Базове використання**
 
@@ -25117,33 +24723,15 @@ player.prepare()
 player.play()
 ```
 
-Для View UI player підключають до `PlayerView`:
-
-```kotlin
-playerView.player = player
-```
+У View UI player задають через `playerView.player = player`.
 
 2. **Lifecycle і ресурси**
 
-Власник player має синхронізувати його з lifecycle і гарантовано викликати `release()`:
-
-```kotlin
-override fun onStop() {
-    player.pause()
-    super.onStop()
-}
-
-override fun onDestroy() {
-    player.release()
-    super.onDestroy()
-}
-```
-
-Конкретний момент release залежить від UX: короткий video screen може володіти player у `Activity`/`Fragment`, а background playback — у service. Не можна залишати reference на знищений `PlayerView`.
+Owner має гарантовано викликати `release()`. Для короткого video це може бути screen/holder, для background playback — service. Reference на `PlayerView` не повинен переживати `onDestroyView()`.
 
 3. **Compose**
 
-Media3 має Compose UI-модулі. Для legacy View UI можна обгорнути `PlayerView`:
+Media3 має Compose UI-модулі. Legacy `PlayerView` можна обгорнути:
 
 ```kotlin
 AndroidView(
@@ -25151,7 +24739,7 @@ AndroidView(
 )
 ```
 
-Player не створюють при кожній recomposition. Йому потрібен стабільний owner і явний cleanup через `DisposableEffect` або окремий holder/service.
+Player не створюють на recomposition: потрібен стабільний owner та cleanup через `DisposableEffect`, holder або service.
 
 4. **Playlist і стан**
 
@@ -25166,54 +24754,31 @@ player.setMediaItems(items)
 player.prepare()
 ```
 
-UI реагує на playback state через `Player.Listener`:
-
-```kotlin
-player.addListener(object : Player.Listener {
-    override fun onPlaybackStateChanged(state: Int) {
-        when (state) {
-            Player.STATE_BUFFERING -> showLoading()
-            Player.STATE_READY -> hideLoading()
-            Player.STATE_ENDED -> showReplay()
-        }
-    }
-
-    override fun onPlayerError(error: PlaybackException) {
-        showError(error)
-    }
-})
-```
-
-Listener використовують для buffering, ended state, errors, analytics і синхронізації UI.
+`Player.Listener` повідомляє про `BUFFERING`, `READY`, `ENDED`, errors та інші events. UI мапить їх у loading/error/replay state; analytics не змішують із rendering logic.
 
 5. **Background playback**
 
-Для music/podcast player і `MediaSession` розміщують у `MediaSessionService`, а UI керує ними через `MediaController`. Це забезпечує:
+Для music/podcast `Player` і `MediaSession` розміщують у `MediaSessionService`, а UI підключається через `MediaController`. Це забезпечує:
 
-- foreground playback і media notification;
-- системні controls, Bluetooth, Wear OS та Android Auto;
-- незалежність playback від lifecycle екрана.
+- media notification і system controls;
+- Bluetooth/Wear OS/Android Auto integration;
+- незалежність від lifecycle screen.
 
 Довге відтворення не повинно належати `Activity` або `Fragment`.
 
 6. **Caching**
 
-Для streaming можна додати `CacheDataSource`. Треба визначити cache size, eviction policy, offline behavior, storage limits і сумісність із DRM.
+Для streaming використовують `CacheDataSource`, явно визначаючи size, eviction, offline behavior та DRM constraints.
 
 7. **Типові помилки**
 
-- player не викликає `release()`;
-- новий player створюється на recomposition;
+- відсутній `release()` або player створюється на recomposition;
 - UI reference переживає `onDestroyView()`;
-- background playback реалізований без `MediaSessionService`;
-- buffering, errors та audio focus не обробляються;
-- player викликається з різних threads замість його application thread.
+- background playback належить screen;
+- не обробляються errors/audio focus;
+- player викликається не з його application thread.
 
-8. **Практичне правило**
-
-Для простого video screen достатньо `ExoPlayer`, UI-компонента та коректного lifecycle. Для production media app потрібні `MediaSessionService`, notification/system controls, error handling, analytics і тести background-сценаріїв.
-
-**Коротко:** Media3 / ExoPlayer — основний Android media stack. Критичні моменти: один чіткий owner player, правильний `release()`, обробка станів і помилок, а для background playback — `MediaSessionService`.
+**Коротко:** Media3/ExoPlayer потребує чіткого owner-а, `release()`, обробки states/errors та application-thread access. Background playback реалізують через `MediaSessionService`, а не screen lifecycle.
 
 </details>
 <details>
