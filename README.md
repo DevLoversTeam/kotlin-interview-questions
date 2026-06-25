@@ -16022,11 +16022,17 @@ assertEquals(expected, repository.currentValue)
 
 #### Kotlin
 
-`inline`, `noinline` і `crossinline` — це модифікатори для функцій вищого порядку. Вони впливають на те, як компілятор працює з lambda-параметрами: вбудовує їх у call site, дозволяє передавати як object або забороняє non-local return.
+`inline`, `noinline` і `crossinline` — модифікатори для higher-order functions. Вони керують тим, як compiler працює з lambda-параметрами.
 
-1. **inline**
+```text
+inline      -> вбудувати function/lambda в call site
+noinline    -> не inline-ити конкретну lambda
+crossinline -> inline-ити, але заборонити non-local return
+```
 
-`inline` просить компілятор вставити тіло функції і lambda в місце виклику:
+### inline
+
+`inline` просить compiler вставити тіло функції і lambda в місце виклику:
 
 ```kotlin
 inline fun measure(block: () -> Unit) {
@@ -16036,30 +16042,20 @@ inline fun measure(block: () -> Unit) {
 }
 ```
 
-Це зменшує overhead на створення lambda object і виклик функції, особливо для маленьких higher-order functions.
+Це зменшує overhead на створення lambda object і function call для маленьких higher-order functions.
 
-2. **Навіщо inline потрібен**
-
-`inline` корисний для:
-
-- маленьких utility functions;
-- DSL;
-- functions з lambda-параметрами;
-- reified generics;
-- performance-sensitive higher-order calls.
-
-Приклад reified:
+`inline` також потрібен для `reified` generics:
 
 ```kotlin
 inline fun <reified T> Gson.fromJson(json: String): T =
     fromJson(json, T::class.java)
 ```
 
-Без `inline` reified type parameter неможливий.
+Без `inline` `reified` type parameter неможливий.
 
-3. **Non-local return**
+### Non-local return
 
-У inline lambda можна зробити return з зовнішньої функції:
+В inline lambda можна зробити `return` із зовнішньої функції:
 
 ```kotlin
 inline fun runBlock(block: () -> Unit) = block()
@@ -16073,9 +16069,9 @@ fun test() {
 
 Це називається non-local return.
 
-4. **noinline**
+### noinline
 
-`noinline` каже: цей lambda-параметр не треба inline-ити:
+`noinline` вимикає inline для конкретної lambda:
 
 ```kotlin
 inline fun execute(
@@ -16092,9 +16088,9 @@ inline fun execute(
 
 `noinline` потрібен, якщо lambda треба зберегти в змінну, передати далі або використати як object.
 
-5. **crossinline**
+### crossinline
 
-`crossinline` забороняє non-local return з lambda:
+`crossinline` залишає inline, але забороняє non-local return:
 
 ```kotlin
 inline fun runLater(crossinline block: () -> Unit) {
@@ -16105,17 +16101,9 @@ inline fun runLater(crossinline block: () -> Unit) {
 }
 ```
 
-Lambda виконується в іншому контексті (`Runnable`), тому `return` із зовнішньої функції був би небезпечним.
+Це потрібно, коли lambda виконується в іншому context, наприклад усередині `Runnable`, callback або іншої lambda.
 
-6. **Різниця коротко**
-
-```text
-inline      -> вбудувати function/lambda в call site
-noinline    -> не inline-ити конкретну lambda
-crossinline -> inline-ити, але заборонити non-local return
-```
-
-7. **Приклад різниці**
+Приклад разом:
 
 ```kotlin
 inline fun example(
@@ -16129,31 +16117,26 @@ inline fun example(
 }
 ```
 
-- `inlined` можна inline-ити повністю;
-- `stored` можна зберігати/передавати;
-- `safe` можна викликати в іншому lambda/context без non-local return.
+Сенс:
 
-8. **Ризики inline**
+- `inlined` — повністю inline;
+- `stored` — можна зберігати/передавати;
+- `safe` — inline, але без non-local return.
 
-`inline` не треба ставити всюди. Якщо функція велика або викликається багато разів у коді, bytecode може роздутись. Inline має сенс переважно для маленьких functions із lambdas або reified generics.
+`inline` не треба ставити всюди. Для великих functions або частих call sites він може роздути bytecode. Найкраще підходить для маленьких higher-order utilities, DSL і `reified` generics.
 
-9. **Практичне правило**
-
-- Хочеш прибрати lambda overhead або зробити reified — `inline`.
-- Треба зберегти lambda або передати далі — `noinline`.
-- Lambda виконується в іншому context і не має робити non-local return — `crossinline`.
-
-**Коротко:** `inline` вбудовує функцію і lambda в місце виклику, `noinline` вимикає inline для конкретної lambda, а `crossinline` залишає inline, але забороняє non-local return. Найчастіше це потрібно для DSL, reified generics і оптимізації маленьких higher-order functions.
+**Коротко:** `inline` вбудовує function/lambda і потрібен для `reified`; `noinline` залишає lambda object, щоб її можна було зберігати або передавати; `crossinline` забороняє non-local return, коли lambda виконується в іншому context.
 
 </details>
+
 <details>
 <summary>215. Які переваги Kotlin над Java?</summary>
 
 #### Kotlin
 
-Kotlin має кілька практичних переваг над Java, особливо в Android: null safety, менше boilerplate, coroutines, extension functions, data classes, sealed classes, smart casts і кращу інтеграцію з modern Android APIs.
+Kotlin має практичні переваги над Java, особливо в Android: null safety, менше boilerplate, coroutines, extension functions, data/sealed classes, smart casts і сильну інтеграцію з Jetpack.
 
-1. **Null safety**
+### Null safety
 
 Kotlin розділяє nullable і non-null типи:
 
@@ -16162,15 +16145,15 @@ val name: String = "Alex"
 val nickname: String? = null
 ```
 
-Це зменшує кількість `NullPointerException`, бо nullable треба обробляти явно:
+Nullable значення треба обробляти явно:
 
 ```kotlin
 val title = user.name ?: "Unknown"
 ```
 
-2. **Менше boilerplate**
+Це не прибирає всі `NullPointerException`, але сильно зменшує їх кількість.
 
-Data class замінює багато Java-коду:
+### Менше boilerplate
 
 ```kotlin
 data class User(
@@ -16179,11 +16162,9 @@ data class User(
 )
 ```
 
-Kotlin автоматично генерує `equals`, `hashCode`, `toString`, `copy`, component functions.
+`data class` генерує `equals`, `hashCode`, `toString`, `copy`, component functions.
 
-3. **Coroutines**
-
-Kotlin coroutines дають зручний async-код:
+### Coroutines
 
 ```kotlin
 viewModelScope.launch {
@@ -16192,9 +16173,9 @@ viewModelScope.launch {
 }
 ```
 
-Це простіше за callbacks і часто читабельніше за складні chains.
+Coroutines роблять async-код читабельнішим за callback-и і зручним для structured concurrency.
 
-4. **Extension functions**
+### Extension functions
 
 ```kotlin
 fun View.show() {
@@ -16202,9 +16183,9 @@ fun View.show() {
 }
 ```
 
-Можна додавати utility-поведінку без наслідування і wrapper classes.
+Дають змогу додавати utility API без inheritance і wrapper classes.
 
-5. **Sealed classes/interfaces**
+### Sealed classes/interfaces
 
 ```kotlin
 sealed interface UiState {
@@ -16214,9 +16195,9 @@ sealed interface UiState {
 }
 ```
 
-Добре підходить для моделювання state, results, effects, navigation events.
+Добре підходять для UI state, results, effects і finite state models.
 
-6. **Smart casts**
+### Smart casts
 
 ```kotlin
 if (state is UiState.Content) {
@@ -16224,9 +16205,9 @@ if (state is UiState.Content) {
 }
 ```
 
-Після перевірки типу Kotlin автоматично cast-ить значення.
+Після type check Kotlin сам робить cast.
 
-7. **Default і named arguments**
+### Named/default arguments
 
 ```kotlin
 fun createUser(name: String, active: Boolean = true)
@@ -16234,21 +16215,15 @@ fun createUser(name: String, active: Boolean = true)
 createUser(name = "Alex")
 ```
 
-Код стає читабельнішим і не треба створювати багато overloads.
+Менше overloads, читабельніші call sites.
 
-8. **Interoperability з Java**
+### Java interoperability
 
-Kotlin добре працює з Java-кодом і бібліотеками:
+Kotlin добре працює з Java-кодом і libraries, тому проєкт можна мігрувати поступово.
 
-```kotlin
-val list = ArrayList<String>()
-```
+### Android ecosystem
 
-Це дозволяє мігрувати поступово, а не переписувати весь проєкт одразу.
-
-9. **Android-first tooling**
-
-Багато сучасних Android API орієнтовані на Kotlin:
+Багато modern Android API Kotlin-first:
 
 - Jetpack Compose;
 - Coroutines/Flow;
@@ -16257,47 +16232,49 @@ val list = ArrayList<String>()
 - Lifecycle scopes;
 - Navigation Kotlin DSL.
 
-10. **Недоліки теж є**
+Tradeoffs теж є:
 
-Kotlin не “магічно кращий” у всьому:
-
-- повільніша компіляція в деяких проєктах;
+- build time може бути гіршим;
+- coroutines треба розуміти глибоко;
+- Java interop дає platform types;
 - складні generics/type inference edge cases;
-- треба розуміти coroutines;
-- Java interop може давати platform types;
-- надмірне використання DSL/extensions може погіршити читабельність.
+- зловживання DSL/extensions погіршує читабельність.
 
-**Коротко:** Kotlin дає null safety, менше boilerplate, data/sealed classes, extension functions, coroutines, smart casts, named/default arguments і сильну інтеграцію з modern Android. Його головна перевага — виразніший і безпечніший код, але якість все одно залежить від архітектури й дисципліни команди.
+**Коротко:** Kotlin дає безпечніший і виразніший код: null safety, data/sealed classes, coroutines, extension functions, smart casts, named/default arguments і кращий Android tooling. Але якість залежить від архітектури й дисципліни, а не тільки від мови.
 
 </details>
+
 <details>
 <summary>216. У чому різниця між val та const val?</summary>
 
 #### Kotlin
 
-`val` і `const val` обидва означають read-only значення, але працюють на різних рівнях. `val` — звичайна read-only property, значення якої може бути обчислене runtime. `const val` — compile-time constant, відоме під час компіляції.
+`val` і `const val` обидва read-only, але це різні речі.
 
-1. **val**
+```text
+val       -> read-only property, значення може бути runtime
+const val -> compile-time constant
+```
+
+`val`:
 
 ```kotlin
 val name = "Alex"
 val createdAt = System.currentTimeMillis()
 ```
 
-`val` не можна перевизначити після ініціалізації, але значення може бути результатом runtime-обчислення.
+`val` не можна перевизначити після ініціалізації, але значення може бути обчислене під час runtime.
 
-2. **const val**
+`const val`:
 
 ```kotlin
 const val API_VERSION = "v1"
 const val MAX_RETRY_COUNT = 3
 ```
 
-`const val` має бути відоме на етапі компіляції. Воно inline-иться в місця використання як константа.
+`const val` має бути відоме компілятору і inline-иться в місця використання.
 
-3. **Де можна оголошувати const val**
-
-`const val` можна оголошувати тільки:
+Де можна оголошувати `const val`:
 
 - top-level;
 - в `object`;
@@ -16311,9 +16288,7 @@ object ApiConfig {
 
 Не можна оголосити `const val` як local variable всередині функції.
 
-4. **Які типи підтримує const val**
-
-`const val` підтримує тільки primitive-like compile-time типи:
+Типи для `const val` обмежені compile-time literals:
 
 - `String`;
 - primitives: `Int`, `Long`, `Boolean`, `Double` тощо.
@@ -16324,18 +16299,7 @@ object ApiConfig {
 const val DATE = LocalDate.now() // помилка
 ```
 
-5. **Runtime vs compile-time**
-
-```kotlin
-val runtimeValue = UUID.randomUUID().toString()
-const val compileTimeValue = "fixed"
-```
-
-`runtimeValue` рахується під час виконання. `compileTimeValue` відомий компілятору.
-
-6. **const val і annotations**
-
-`const val` можна використовувати там, де потрібна compile-time constant:
+`const val` потрібен там, де API вимагає compile-time constant, наприклад annotations:
 
 ```kotlin
 const val TABLE_USERS = "users"
@@ -16344,39 +16308,35 @@ const val TABLE_USERS = "users"
 data class UserEntity(...)
 ```
 
-Звичайний `val` для такого не підійде, якщо annotation вимагає константу.
+Звичайний `val` тут не підійде, якщо annotation очікує константу.
 
-7. **Java interop**
+Java interop: `const val` компілюється як `static final` field і може використовуватись із Java як константа.
 
-`const val` компілюється як static final field. Java-код може використовувати його як константу.
+Ризики:
 
-8. **Ризик inline constants**
+- `const val` inline-иться, тому після зміни значення в library залежні модулі можуть потребувати recompilation;
+- `const val` не захищає secrets/API keys — значення легко дістати з APK;
+- не треба робити `const val` з усього, що просто “не змінюється”.
 
-Оскільки `const val` inline-иться, при зміні значення в library інші модулі можуть потребувати recompilation. Інакше вони можуть бачити старе значення.
+Практичний вибір:
 
-9. **Коли що використовувати**
+- runtime value або object — `val`;
+- literal compile-time constant — `const val`;
+- значення для annotation — `const val`;
+- secrets — не `const val`, а нормальна security/config стратегія.
 
-- `val` — майже завжди для read-only значень.
-- `const val` — тільки для справжніх compile-time constants.
-- Для secrets/API keys `const val` не дає безпеки: значення легко витягнути з APK.
-
-10. **Практичне правило**
-
-Якщо значення обчислюється runtime або є object — використовуй `val`. Якщо це простий literal, потрібний у annotations або як stable constant — `const val`.
-
-**Коротко:** `val` — read-only property, яка може бути runtime-значенням. `const val` — compile-time constant для `String`/primitives, доступна top-level або в object/companion object і може використовуватись в annotations. `const val` не є способом захисту secrets.
+**Коротко:** `val` — read-only property, яка може бути runtime-значенням. `const val` — compile-time constant для `String`/primitives, дозволена top-level або в `object/companion object`, і підходить для annotations. Secrets у `const val` зберігати не можна.
 
 </details>
+
 <details>
 <summary>217. Які типи можна використовувати з const val?</summary>
 
 #### Kotlin
 
-`const val` оголошує compile-time constant. Його типом може бути `String` або primitive type, а значення має бути відоме компілятору без виконання програми.
+`const val` — це compile-time constant. Тип має бути `String` або primitive, а initializer має бути відомий компілятору без виконання програми.
 
-1. **Дозволені типи**
-
-З `const val` можна використовувати:
+Дозволені типи:
 
 ```kotlin
 const val STRING_VALUE: String = "user_id"
@@ -16390,9 +16350,7 @@ const val BYTE_VALUE: Byte = 1
 const val SHORT_VALUE: Short = 2
 ```
 
-Тип можна вказати явно або дозволити inference.
-
-2. **Типові приклади**
+Типові приклади:
 
 ```kotlin
 const val ARG_USER_ID = "user_id"
@@ -16404,11 +16362,11 @@ const val LOGGING_ENABLED = true
 const val CSV_SEPARATOR = ','
 ```
 
-Так зберігають keys, route names, table names, limits і flags, якщо вони не залежать від runtime.
+Де можна оголошувати:
 
-3. **Де оголошувати**
-
-`const val` дозволений top-level, в `object` або `companion object`:
+- top-level;
+- в `object`;
+- в `companion object`.
 
 ```kotlin
 const val API_VERSION = "v1"
@@ -16424,11 +16382,9 @@ class UserFragment {
 }
 ```
 
-Він не може бути local variable або instance property класу.
+Не можна оголосити `const val` як local variable або instance property.
 
-4. **Що не дозволено**
-
-Objects, collections, nullable types і runtime-вирази не є compile-time constants:
+Що не дозволено:
 
 ```kotlin
 const val USERS = listOf("Alex", "Bob")
@@ -16438,16 +16394,14 @@ const val DEFAULT_THEME = ThemeMode.Light
 const val NAME: String? = null
 ```
 
-Для таких значень використовують звичайний `val`:
+Для objects, collections, nullable values і runtime expressions використовують звичайний `val`:
 
 ```kotlin
 val DEFAULT_THEME = ThemeMode.Light
 val SUPPORTED_LANGUAGES = listOf("en", "uk")
 ```
 
-5. **Constant expressions**
-
-Initializer може містити literals, інші constants і дозволені compile-time operations:
+Initializer може містити literals, інші constants і compile-time operations:
 
 ```kotlin
 const val HOST = "example.com"
@@ -16455,34 +16409,29 @@ const val API_URL = "https://" + HOST
 const val TIMEOUT_SECONDS = 5 * 2
 ```
 
-Function calls, доступ до `context` або поточного часу не дозволені.
+Function calls, `Context`, current time, random values або object creation не є compile-time constants.
 
-6. **Використання в annotations**
-
-Annotation arguments часто вимагають compile-time constant:
+`const val` часто потрібен для annotation arguments:
 
 ```kotlin
 const val USERS_TABLE = "users"
-```
 
-```kotlin
 @Entity(tableName = USERS_TABLE)
 data class UserEntity(
     @PrimaryKey val id: String
 )
 ```
 
-Звичайний `val` не підходить, якщо annotation очікує compile-time value.
-
-**Коротко:** `const val` підтримує `String` і primitive types із compile-time initializer. Для objects, collections, nullable або runtime values використовують звичайний `val`.
+**Коротко:** `const val` підтримує тільки `String` і primitive types з compile-time initializer. Для objects, collections, nullable або runtime values треба використовувати звичайний `val`.
 
 </details>
+
 <details>
 <summary>218. Чи можна створити data class без параметрів?</summary>
 
 #### Kotlin
 
-Ні. Primary constructor `data class` повинен містити щонайменше один parameter, і кожен parameter має бути `val` або `var`.
+Ні. `data class` має мати primary constructor мінімум з одним parameter, і цей parameter має бути `val` або `var`.
 
 Некоректно:
 
@@ -16501,9 +16450,7 @@ data class User(
 )
 ```
 
-### Чому constructor обов'язковий
-
-Compiler генерує methods лише з primary-constructor properties:
+Причина: compiler генерує methods саме з primary-constructor properties:
 
 ```text
 equals()
@@ -16512,8 +16459,6 @@ toString()
 copy()
 componentN()
 ```
-
-Саме вони визначають value semantics.
 
 Property у body не входить у generated equality, hash, copy і destructuring:
 
@@ -16525,13 +16470,9 @@ data class User(
 }
 ```
 
-Objects з однаковим `id`, але різним `cachedLabel`, рівні. `copy()` створить body property заново через initializer.
+Два `User` з однаковим `id`, але різним `cachedLabel`, будуть рівні. Тому value-defining fields мають бути в primary constructor.
 
-Value-defining fields мають бути в primary constructor.
-
-### Виклик без arguments
-
-Можна задати defaults:
+Виклик без arguments можливий через default values:
 
 ```kotlin
 data class User(
@@ -16542,23 +16483,22 @@ data class User(
 val user = User()
 ```
 
-Class усе одно має два parameters, але caller використовує defaults. На JVM, якщо defaults є для всіх parameters, генерується parameterless constructor.
+Клас усе одно має parameters, просто caller використовує defaults. Але defaults не повинні створювати invalid domain object тільки заради framework.
 
-Defaults на кшталт `id = ""` не повинні створювати invalid domain object лише заради framework.
+Якщо framework потребує no-arg constructor, краще використати:
 
-### Frameworks
+- окрему persistence/DTO model;
+- adapter/mapper;
+- Kotlin no-arg plugin;
+- valid defaults, якщо вони справді мають сенс.
 
-Для framework із no-arg requirement використовують adapter, окрему persistence model або Kotlin no-arg plugin.
-
-### Стан без payload
-
-Якщо case не має data, потрібен singleton:
+Якщо стан не має payload, краще використовувати singleton:
 
 ```kotlin
 data object Loading
 ```
 
-У закритій hierarchy:
+У sealed hierarchy:
 
 ```kotlin
 sealed interface ScreenState {
@@ -16574,35 +16514,30 @@ sealed interface ScreenState {
 }
 ```
 
-`object` створює singleton. `data object` додає data-like `toString()`/equality semantics та симетрично виглядає в sealed hierarchy.
+Інші обмеження: `data class` не може бути `abstract`, `open`, `sealed` або `inner`, але може реалізовувати interfaces.
 
-Для state без payload singleton зазвичай точніший за пустий regular class.
-
-### Інші обмеження data class
-
-Data class не може бути `abstract`, `open`, `sealed` або `inner`, але може реалізовувати interfaces.
-
-### Практичний вибір
+Практичний вибір:
 
 - value model — `data class`;
-- no-arg call — valid defaults;
-- state без payload — `data object`;
+- no-arg call — default values;
+- state без payload — `object` / `data object`;
 - framework no-arg — adapter/plugin;
-- value property — primary constructor.
+- value fields — тільки primary constructor.
 
-**Коротко:** empty `data class` не компілюється: потрібен хоча б один `val/var` parameter. Defaults дозволяють виклик без arguments, а state без payload моделюють `object`/`data object`.
+**Коротко:** пустий `data class` не компілюється. Потрібен хоча б один `val/var` parameter у primary constructor. Для no-arg виклику використовують defaults, а для стану без payload — `object` або `data object`.
 
 </details>
+
 <details>
 <summary>219. У чому різниця між sealed class та enum?</summary>
 
 #### Kotlin
 
-Обидва задають обмежений набір варіантів, але моделюють різне:
+`enum` і `sealed` обмежують набір варіантів, але моделюють різні речі.
 
 ```text
 enum   -> фіксовані singleton entries одного типу
-sealed -> закрита ієрархія різних subtype-ів
+sealed -> закрита hierarchy різних subtype-ів
 ```
 
 ### Enum
@@ -16615,13 +16550,13 @@ enum class ThemeMode {
 }
 ```
 
-Enum доречний, коли cases мають однакову структуру й не потребують різного payload. Кожен entry — єдиний instance:
+`enum` підходить, коли всі cases мають однакову структуру і не потребують різного payload. Кожен entry — singleton:
 
 ```kotlin
 ThemeMode.Dark === ThemeMode.Dark // true
 ```
 
-Enum може мати спільні properties і methods:
+Enum може мати спільні properties:
 
 ```kotlin
 enum class HttpMethod(
@@ -16634,11 +16569,11 @@ enum class HttpMethod(
 }
 ```
 
-Усі entries мають той самий property contract. Enum також має built-in API: `entries`, `valueOf()`, `name`, `ordinal`.
+Усі entries мають однаковий property contract. Enum має built-in API: `entries`, `valueOf()`, `name`, `ordinal`.
 
-`ordinal` не слід зберігати в DB/API: зміна порядку entries змінить значення. Для persistence краще стабільний explicit code.
+`ordinal` не треба зберігати в DB/API: порядок entries може змінитися. Для persistence краще explicit stable code.
 
-### Sealed type
+### Sealed
 
 ```kotlin
 sealed interface UiState {
@@ -16654,11 +16589,15 @@ sealed interface UiState {
 }
 ```
 
-Кожен subtype має власні fields і behavior. `Loading` — singleton, а `Content` має багато instances із різними users.
+`sealed` підходить, коли variants мають різний payload або behavior. `Loading` — singleton, `Content` має дані, `Error` має іншу модель.
 
-Це підходить для UI state, domain result, events та errors, де variants мають різний payload.
+Типові use cases:
 
-Direct subclasses sealed type відомі compiler-у та мають бути оголошені в дозволених межах Kotlin module/package. Ієрархію не можна довільно розширити з іншого module, тому compiler може перевіряти повноту cases.
+- UI state;
+- domain result;
+- errors;
+- events;
+- finite state machine.
 
 ### Exhaustive when
 
@@ -16682,11 +16621,11 @@ when (state) {
 }
 ```
 
-Якщо додати новий case, compiler покаже місця, де exhaustive `when` треба оновити. Зайвий `else` може приховати цю користь.
+Compiler знає всі cases і може перевірити exhaustive `when`. Зайвий `else` часто приховує користь цієї перевірки.
 
 ### Sealed class vs sealed interface
 
-`sealed class` може мати constructor, stored state і protected members:
+`sealed class` може мати constructor state і protected members:
 
 ```kotlin
 sealed class AppError(
@@ -16694,54 +16633,41 @@ sealed class AppError(
 )
 ```
 
-`sealed interface` не має constructor state, але implementation може реалізувати кілька interfaces і успадкувати інший class. Для state/result hierarchies часто достатньо `sealed interface`.
+`sealed interface` не має constructor state, але implementation може реалізувати кілька interfaces і наслідувати інший class. Для state/result models часто достатньо `sealed interface`.
 
 ### Serialization
 
-Enum зазвичай серіалізується як стабільне textual/code value. Sealed hierarchy потребує discriminator, щоб визначити subtype, та окремої schema для payload. Library має бути явно налаштована на versioning і unknown variants.
+Enum зазвичай серіалізується як stable textual/code value. Sealed hierarchy потребує discriminator для subtype і schema для payload. Треба думати про versioning і unknown variants.
 
-### Практичний вибір
+Практичний вибір:
 
-Enum:
+- simple fixed mode/status — `enum`;
+- cases без різного payload — `enum`;
+- UI/result/error state з різними fields — `sealed`;
+- object + data class cases в одній model — `sealed`;
+- не замінювати enum sealed-типом “на майбутнє” без потреби.
 
-- theme, sort order, fixed mode;
-- simple status без різного payload;
-- потрібні `entries/valueOf`;
-- один instance на case.
-
-Sealed:
-
-- UI/result state;
-- domain outcomes та errors;
-- variants із різними fields;
-- object і data class cases в одній hierarchy.
-
-Не потрібно замінювати enum sealed-типом лише «на майбутнє»: вибір визначає поточна model.
-
-**Коротко:** enum — фіксований список singleton entries зі спільною структурою. Sealed class/interface — закрита subtype hierarchy, де кожен case може мати власний payload. Для простих modes — enum, для state/result models — sealed.
+**Коротко:** `enum` — фіксований список singleton entries зі спільною структурою. `sealed class/interface` — закрита hierarchy, де кожен case може мати власний payload. Для простих modes — `enum`, для state/result models — `sealed`.
 
 </details>
+
 <details>
 <summary>220. Що таке WorkManager?</summary>
 
 #### Kotlin
 
-`WorkManager` — це Jetpack API для гарантованої відкладеної background work. Його використовують для задач, які мають виконатись навіть якщо застосунок закрили або процес був убитий, але задача не обовʼязково має стартувати миттєво.
+`WorkManager` — Jetpack API для гарантованої відкладеної background work. Його використовують для задач, які мають виконатися навіть після закриття app або kill process, але не обов'язково прямо зараз.
 
-1. **Для чого потрібен WorkManager**
-
-WorkManager підходить для:
+Підходить для:
 
 - background sync;
 - upload/download з retry;
 - cleanup старих даних;
-- відправки logs/analytics;
+- sending logs/analytics;
 - periodic sync;
 - задач із constraints: network, charging, battery not low.
 
-Якщо задача user-visible і має виконуватись прямо зараз, може знадобитись foreground service.
-
-2. **OneTimeWorkRequest**
+Одноразова задача:
 
 ```kotlin
 val request = OneTimeWorkRequestBuilder<SyncWorker>()
@@ -16750,9 +16676,7 @@ val request = OneTimeWorkRequestBuilder<SyncWorker>()
 WorkManager.getInstance(context).enqueue(request)
 ```
 
-Це одноразова задача.
-
-3. **CoroutineWorker**
+`CoroutineWorker`:
 
 ```kotlin
 class SyncWorker(
@@ -16760,6 +16684,7 @@ class SyncWorker(
     params: WorkerParameters,
     private val repository: SyncRepository
 ) : CoroutineWorker(context, params) {
+
     override suspend fun doWork(): Result {
         return try {
             repository.sync()
@@ -16773,9 +16698,15 @@ class SyncWorker(
 }
 ```
 
-`Result.success()` — задача виконана. `Result.retry()` — повторити пізніше. `Result.failure()` — завершити з помилкою.
+Результати:
 
-4. **Constraints**
+```text
+Result.success() -> виконано
+Result.retry()   -> повторити пізніше
+Result.failure() -> завершити з помилкою
+```
+
+Constraints:
 
 ```kotlin
 val constraints = Constraints.Builder()
@@ -16784,9 +16715,9 @@ val constraints = Constraints.Builder()
     .build()
 ```
 
-WorkManager запустить задачу тільки коли constraints виконані.
+WorkManager запустить роботу тільки коли constraints виконані.
 
-5. **PeriodicWorkRequest**
+Periodic work:
 
 ```kotlin
 val request = PeriodicWorkRequestBuilder<SyncWorker>(
@@ -16794,11 +16725,9 @@ val request = PeriodicWorkRequestBuilder<SyncWorker>(
 ).build()
 ```
 
-Periodic work не гарантує точний час запуску. Android сам вибирає оптимальний момент з урахуванням battery і system policy.
+Periodic work не гарантує точний час запуску: Android вибирає момент з урахуванням battery і system policy.
 
-6. **Unique work**
-
-Щоб не запускати дублікати:
+Щоб не створювати дублікати, використовують unique work:
 
 ```kotlin
 WorkManager.getInstance(context).enqueueUniqueWork(
@@ -16808,9 +16737,9 @@ WorkManager.getInstance(context).enqueueUniqueWork(
 )
 ```
 
-`KEEP` залишає поточну задачу, `REPLACE` скасовує стару і додає нову.
+`KEEP` залишає поточну задачу, `REPLACE` скасовує стару і ставить нову.
 
-7. **Input data**
+Input data має бути маленьким:
 
 ```kotlin
 val request = OneTimeWorkRequestBuilder<UploadWorker>()
@@ -16818,9 +16747,9 @@ val request = OneTimeWorkRequestBuilder<UploadWorker>()
     .build()
 ```
 
-Передавати треба невеликі primitive/string values. Великі обʼєкти краще зберігати в DB і передавати id.
+Великі objects краще зберігати в DB і передавати тільки `id`.
 
-8. **Work chaining**
+Chaining:
 
 ```kotlin
 WorkManager.getInstance(context)
@@ -16830,36 +16759,38 @@ WorkManager.getInstance(context)
     .enqueue()
 ```
 
-Так можна будувати послідовність background-задач.
-
-9. **Коли не підходить**
-
 WorkManager не підходить для:
 
 - точних alarm-ів;
 - постійного socket connection;
 - media playback;
 - realtime tracking;
-- задач, які мають виконуватись негайно;
-- роботи, яка має йти постійно у foreground без перерв.
+- роботи, яка має стартувати негайно;
+- довгого user-visible foreground сценарію без перерв.
 
-10. **Практичне правило**
-
-WorkManager — для deferrable, guaranteed background work. Якщо задачу можна відкласти, але треба надійно виконати з constraints/retry, це хороший кандидат для WorkManager.
-
-**Коротко:** WorkManager — Jetpack API для гарантованої відкладеної background work. Він підтримує constraints, retry, periodic work, unique work і chaining. Його використовують для sync/upload/cleanup, але не для точних alarm-ів, realtime-задач, media playback або постійних foreground-сценаріїв.
+**Коротко:** `WorkManager` — для deferrable, guaranteed background work із constraints, retry, periodic/unique work і chaining. Для realtime, exact alarms, media playback або негайної foreground роботи потрібні інші API.
 
 </details>
+
 <details>
 <summary>221. Коли варто використовувати WorkManager?</summary>
 
 #### Kotlin
 
-WorkManager обирають для persistent deferrable work: operation може стартувати пізніше, але має продовжити планування після process death або reboot та виконатися за constraints.
+`WorkManager` варто використовувати для persistent deferrable work: задачу можна відкласти, але вона має бути надійно виконана після закриття UI, process death або reboot, з урахуванням constraints.
 
-Сценарії: sync, retry upload, cleanup, logs і periodic refresh. Exact time не гарантується; force stop та uninstall припиняють work.
+Підходить для:
 
-### One-time work
+- background sync;
+- retry upload/download;
+- cleanup старих даних;
+- sending logs/analytics;
+- periodic refresh;
+- задач із network/charging/battery constraints.
+
+Exact time не гарантується. Force stop і uninstall припиняють work.
+
+One-time work:
 
 ```kotlin
 val request = OneTimeWorkRequestBuilder<SyncWorker>()
@@ -16870,13 +16801,10 @@ val request = OneTimeWorkRequestBuilder<SyncWorker>()
     )
     .build()
 
-WorkManager.getInstance(context)
-    .enqueue(request)
+WorkManager.getInstance(context).enqueue(request)
 ```
 
-Request persist-иться та передається system scheduler-у.
-
-### CoroutineWorker
+`CoroutineWorker` приклад:
 
 ```kotlin
 @HiltWorker
@@ -16900,17 +16828,24 @@ class SyncWorker @AssistedInject constructor(
 }
 ```
 
-- `success()` — завершено;
-- `retry()` — transient failure;
-- `failure()` — permanent failure.
+Результати:
 
-Worker має бути idempotent: його можуть зупинити та запустити повторно. Cancellation не перетворюють на retry.
+```text
+success() -> завершено
+retry()   -> transient failure
+failure() -> permanent failure
+```
 
-### Constraints та unique work
+Worker має бути idempotent: систему може зупинити і запустити його повторно. `CancellationException` не треба перетворювати на retry.
 
-Constraints описують network, charging, battery/storage conditions, але не момент запуску. Для retries налаштовують backoff.
+Constraints описують умови запуску, але не точний час:
 
-Unique work запобігає duplicate sync:
+- network;
+- charging;
+- battery not low;
+- storage not low.
+
+Unique work запобігає duplicate jobs:
 
 ```kotlin
 WorkManager.getInstance(context)
@@ -16921,17 +16856,11 @@ WorkManager.getInstance(context)
     )
 ```
 
-Policy залишає, замінює або продовжує existing work/chain.
+Periodic work виконується приблизно: Doze, battery policy і constraints можуть змістити запуск.
 
-### Periodic work
+Input `Data` має бути маленьким: primitives/String. Великі objects краще зберігати в Room/file і передавати worker-у тільки `id`.
 
-Periodic work виконується приблизно: Doze, battery policy та constraints зміщують запуск. Exact user alarm потребує `AlarmManager`, якщо use case має право на точність.
-
-### Input data
-
-`Data` використовують для невеликих primitive/String values. Великі objects зберігають у Room/file, а Worker отримує ID і читає актуальні дані після restart.
-
-### Коли не підходить
+Коли не підходить:
 
 ```text
 screen-bound work -> ViewModel/lifecycle scope
@@ -16940,101 +16869,128 @@ media/tracking    -> Foreground Service
 realtime socket   -> active runtime architecture
 ```
 
-Expedited work має quotas і не перетворює WorkManager на realtime API.
+`ExpeditedWorkRequest` має quotas і не робить WorkManager realtime API.
 
-**Коротко:** WorkManager потрібен, якщо idempotent operation можна відкласти, але важливо виконати після закриття UI з constraints/retry. Для UI work, realtime, media та exact alarms використовують інші механізми.
+**Коротко:** WorkManager потрібен для idempotent background work, яку можна відкласти, але треба надійно виконати з constraints і retry. Для UI-bound, realtime, media, tracking або exact-time задач потрібні інші API.
 
 </details>
+
 <details>
 <summary>222. Чи працювали ви з Android Media3 / ExoPlayer?</summary>
 
 #### Kotlin
 
-Так. `Media3` — Jetpack media stack, а `ExoPlayer` — default implementation інтерфейсу `Player`. Він підтримує local/streaming media, playlists, adaptive formats, subtitles та DRM.
+Так. `Media3` — сучасний Jetpack media stack, а `ExoPlayer` — default implementation інтерфейсу `Player`. Він підтримує local/streaming media, playlists, adaptive streaming, subtitles і DRM.
 
-1. **Базове використання**
+Базове використання:
 
 ```kotlin
 val player = ExoPlayer.Builder(context).build()
+
 player.setMediaItem(MediaItem.fromUri(videoUrl))
 player.prepare()
 player.play()
 ```
 
-У View UI player задають через `playerView.player = player`.
+У View UI:
 
-2. **Lifecycle і ресурси**
+```kotlin
+playerView.player = player
+```
 
-Owner має гарантовано викликати `release()`. Для короткого video це може бути screen/holder, для background playback — service. Reference на `PlayerView` не повинен переживати `onDestroyView()`.
+Головне — правильно визначити owner player-а і гарантовано викликати `release()`.
 
-3. **Compose**
+```kotlin
+override fun onDestroyView() {
+    playerView.player = null
+    player.release()
+    super.onDestroyView()
+}
+```
 
-Media3 має Compose UI-модулі. Legacy `PlayerView` можна обгорнути:
+Reference на `PlayerView` не має переживати `onDestroyView()`.
+
+У Compose legacy `PlayerView` можна обгорнути через `AndroidView`:
 
 ```kotlin
 AndroidView(
-    factory = { PlayerView(it).apply { player = exoPlayer } }
+    factory = { context ->
+        PlayerView(context).apply {
+            player = exoPlayer
+        }
+    }
 )
 ```
 
-Player не створюють на recomposition: потрібен стабільний owner та cleanup через `DisposableEffect`, holder або service.
+Player не можна створювати на кожну recomposition. Потрібен стабільний owner і cleanup через `DisposableEffect`, holder або service.
 
-4. **Playlist і стан**
+Playlist:
 
 ```kotlin
-val items = videos.map {
+val items = videos.map { video ->
     MediaItem.Builder()
-        .setUri(it.url)
-        .setMediaId(it.id)
+        .setUri(video.url)
+        .setMediaId(video.id)
         .build()
 }
+
 player.setMediaItems(items)
 player.prepare()
 ```
 
-`Player.Listener` повідомляє про `BUFFERING`, `READY`, `ENDED`, errors та інші events. UI мапить їх у loading/error/replay state; analytics не змішують із rendering logic.
+`Player.Listener` дає playback states і errors:
 
-5. **Background playback**
+- `BUFFERING`;
+- `READY`;
+- `ENDED`;
+- playback error;
+- media item transition.
 
-Для music/podcast `Player` і `MediaSession` розміщують у `MediaSessionService`, а UI підключається через `MediaController`. Це забезпечує:
+UI мапить ці events у loading/error/replay state. Analytics краще не змішувати з rendering logic.
 
-- media notification і system controls;
+Для background playback, music або podcasts player не має належати `Activity/Fragment`. Правильна схема:
+
+```text
+MediaSessionService owns Player + MediaSession
+UI connects via MediaController
+```
+
+Це дає:
+
+- media notification;
+- system controls;
 - Bluetooth/Wear OS/Android Auto integration;
-- незалежність від lifecycle screen.
+- незалежність playback від screen lifecycle.
 
-Довге відтворення не повинно належати `Activity` або `Fragment`.
+Для streaming/cache використовують `CacheDataSource`, явно задаючи cache size, eviction strategy, offline behavior і DRM constraints.
 
-6. **Caching**
+Типові помилки:
 
-Для streaming використовують `CacheDataSource`, явно визначаючи size, eviction, offline behavior та DRM constraints.
+- не викликати `release()`;
+- створювати player під час recomposition;
+- тримати `PlayerView` після `onDestroyView()`;
+- робити background playback у screen lifecycle;
+- не обробляти errors/audio focus;
+- викликати player не з його application thread.
 
-7. **Типові помилки**
-
-- відсутній `release()` або player створюється на recomposition;
-- UI reference переживає `onDestroyView()`;
-- background playback належить screen;
-- не обробляються errors/audio focus;
-- player викликається не з його application thread.
-
-**Коротко:** Media3/ExoPlayer потребує чіткого owner-а, `release()`, обробки states/errors та application-thread access. Background playback реалізують через `MediaSessionService`, а не screen lifecycle.
+**Коротко:** Media3/ExoPlayer потребує чіткого owner-а, lifecycle cleanup, `release()`, обробки states/errors і правильного thread access. Для background playback використовують `MediaSessionService`, а не `Activity` або `Fragment`.
 
 </details>
+
 <details>
 <summary>223. Як би ви розподілили компоненти по модулях, якщо є кнопка, яка по кліку завантажує дані?</summary>
 
 #### Kotlin
 
-Модулі будують навколо feature/use case, а не кнопки:
+Модулі треба будувати навколо feature/use case, а не навколо кнопки.
 
 ```text
 Button -> ViewModel -> UseCase -> Repository -> API/DB
 ```
 
-UI лише надсилає event і рендерить state. Він не знає, чи data прийшла з network, Room або cache.
+UI тільки надсилає event і рендерить state. Він не знає, звідки прийшли дані: network, Room або cache.
 
-### Структура
-
-Для невеликого app:
+Для невеликого app достатньо такої структури:
 
 ```text
 :app
@@ -17043,16 +16999,24 @@ UI лише надсилає event і рендерить state. Він не зн
 :feature:profile
 ```
 
-У `:feature:profile` достатньо packages `presentation/domain/data`. Окремі Gradle modules для кожного шару не потрібні.
+У `:feature:profile` можуть бути packages:
 
-Для великої feature з окремою ownership:
+```text
+presentation
+domain
+data
+```
+
+Окремі Gradle modules для кожного шару не потрібні, якщо немає реальної isolation/ownership.
+
+Для великої feature можна розділити API та implementation:
 
 ```text
 :feature:profile:api
 :feature:profile:impl
 ```
 
-`api` містить лише public navigation/capability contracts, `impl` — screen, ViewModel, domain і data implementation.
+`api` містить public contracts: navigation, capabilities, interfaces. `impl` містить screen, ViewModel, use cases, repository implementation.
 
 ### Presentation
 
@@ -17070,13 +17034,13 @@ fun ProfileScreen(
 
 ViewModel:
 
-- обробляє click;
+- приймає click event;
 - запускає coroutine;
-- керує loading/content/error;
-- визначає policy duplicate clicks;
-- переживає rotation через StateFlow.
+- керує `loading/content/error`;
+- обробляє duplicate clicks;
+- тримає state у `StateFlow`.
 
-Retrofit і SQL у presentation бути не повинні.
+Retrofit, SQL і cache logic не мають бути в presentation.
 
 ### Domain
 
@@ -17093,9 +17057,9 @@ interface ProfileRepository {
 }
 ```
 
-Use case потрібен, якщо є business rule, orchestration або reuse. Якщо це лише proxy одного method у маленькій feature, ViewModel може залежати від repository contract напряму.
+Use case потрібен, якщо є business rule, orchestration або reuse. Якщо це простий proxy в маленькій feature, ViewModel може залежати напряму від repository contract.
 
-Domain не залежить від Android UI, Retrofit, Room або DI.
+Domain не залежить від Android UI, Retrofit, Room або DI framework.
 
 ### Data
 
@@ -17113,14 +17077,12 @@ class ProfileRepositoryImpl(
 }
 ```
 
-Data layer володіє API, DB, cache/source-of-truth, mappings та infrastructure error mapping.
+Data layer відповідає за API, DB, cache/source of truth, mapping і infrastructure error mapping.
 
-Core network/database надають reusable clients, але не містять profile business logic.
-
-### Dependency direction
+Dependency direction:
 
 ```text
-app -> feature implementation
+app -> feature impl
 presentation -> domain contract
 data -> domain contract
 core -X-> feature
@@ -17135,20 +17097,16 @@ abstract fun bindRepository(
 ): ProfileRepository
 ```
 
-Одна feature не повинна залежати від internal classes іншої. Для взаємодії використовують narrow API/navigation contract.
-
-### Критерій модульності
-
-Окремий module виправданий, якщо дає:
+Критерії для окремого Gradle module:
 
 - independent ownership;
 - stable public API;
 - dependency isolation;
 - reusable capability;
-- build benefit.
+- build-time benefit.
 
-Інакше packages простіші. Надмірна modularization додає Gradle, DI та navigation boilerplate.
+Якщо цих причин немає, packages простіші. Надмірна modularization додає Gradle, DI і navigation boilerplate без реальної користі.
 
-**Коротко:** кнопка й state живуть у feature presentation, business operation — у domain/use case, API/DB та repository implementation — у data. Для малого app достатньо packages; Gradle modules додають лише для реальної isolation та ownership.
+**Коротко:** кнопка і state живуть у `presentation`, business operation — у `domain/use case`, API/DB і repository implementation — у `data`. Для малого app вистачить packages; Gradle modules додають тільки для isolation, ownership або build benefit.
 
 </details>
